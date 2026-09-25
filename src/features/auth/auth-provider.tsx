@@ -231,15 +231,16 @@ export function AuthProvider({
       ? profile
       : null;
 
+  const hasProfileError =
+    session !== null &&
+    profileStatus === 'error';
+
   const isReady =
     sessionLoaded &&
     (
       !session ||
-      (
-        profileBelongsToSession &&
-        profileStatus === 'ready'
-      ) ||
-      profileStatus === 'error'
+      profileBelongsToSession ||
+      hasProfileError
     );
 
   const value = useMemo(
@@ -253,6 +254,7 @@ export function AuthProvider({
         session !== null &&
         activeProfile !== null &&
         activeProfile.onboarding_completed !== true,
+      hasProfileError,
       error,
       refreshProfile,
       signOut,
@@ -261,6 +263,7 @@ export function AuthProvider({
       session,
       activeProfile,
       isReady,
+      hasProfileError,
       error,
       refreshProfile,
       signOut,

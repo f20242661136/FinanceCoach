@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { copy } from '@/i18n/copy';
 
 import {
   signInSchema,
@@ -49,6 +50,19 @@ export async function signUpWithEmail(
   return data;
 }
 
+export async function resendSignupConfirmation(
+  email: string,
+): Promise<void> {
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email: email.trim().toLowerCase(),
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function signOutCurrentSession(): Promise<void> {
   const { error } = await supabase.auth.signOut({
     scope: 'local',
@@ -57,4 +71,43 @@ export async function signOutCurrentSession(): Promise<void> {
   if (error) {
     throw error;
   }
+}
+
+export function getFriendlyAuthError(
+  error: unknown,
+): string {
+  if (!(error instanceof Error)) {
+    return copy.auth.errors.generic;
+  }
+
+  const message =
+    error.message.toLowerCase();
+
+  if (
+    message.includes(
+      'invalid login credentials',
+    )
+  ) {
+    return copy.auth.errors.invalidCredentials;
+  }
+
+  if (
+    message.includes(
+      'already registered',
+    ) ||
+    message.includes(
+      'user already registered',
+    )
+  ) {
+    return copy.auth.errors.alreadyRegistered;
+  }
+
+  if (
+    message.includes('network') ||
+    message.includes('fetch')
+  ) {
+    return copy.auth.errors.network;
+  }
+
+  return copy.auth.errors.generic;
 }

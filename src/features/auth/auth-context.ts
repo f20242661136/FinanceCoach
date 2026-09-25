@@ -17,6 +17,7 @@ export type AuthContextValue = {
   isReady: boolean;
   isAuthenticated: boolean;
   needsOnboarding: boolean;
+  hasProfileError: boolean;
 
   error: string | null;
 

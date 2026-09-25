@@ -1,18 +1,91 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { Stack } from 'expo-router';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import {
+  colors,
+} from '@/design/tokens';
+import {
+  AuthProvider,
+} from '@/features/auth/auth-provider';
+import {
+  useAuth,
+} from '@/features/auth/auth-context';
+import {
+  LoadingScreen,
+} from '@/components/ui/loading-screen';
+import {
+  ProfileErrorScreen,
+} from '@/components/ui/profile-error-screen';
 
-SplashScreen.preventAutoHideAsync();
+function RootNavigator() {
+  const {
+    isReady,
+    isAuthenticated,
+    needsOnboarding,
+    hasProfileError,
+    error,
+    refreshProfile,
+    signOut,
+  } = useAuth();
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  if (!isReady) {
+    return <LoadingScreen />;
+  }
+
+  if (hasProfileError) {
+    return (
+      <ProfileErrorScreen
+        detail={error}
+        onRetry={refreshProfile}
+        onSignOut={signOut}
+      />
+    );
+  }
+
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: {
+          backgroundColor:
+            colors.background,
+        },
+      }}
+    >
+      <Stack.Screen name="index" />
+
+      <Stack.Protected
+        guard={!isAuthenticated}
+      >
+        <Stack.Screen name="(auth)" />
+      </Stack.Protected>
+
+      <Stack.Protected
+        guard={
+          isAuthenticated &&
+          needsOnboarding
+        }
+      >
+        <Stack.Screen
+          name="(onboarding)"
+        />
+      </Stack.Protected>
+
+      <Stack.Protected
+        guard={
+          isAuthenticated &&
+          !needsOnboarding
+        }
+      >
+        <Stack.Screen name="(app)" />
+      </Stack.Protected>
+    </Stack>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <RootNavigator />
+    </AuthProvider>
   );
 }
