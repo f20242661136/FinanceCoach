@@ -1,21 +1,12 @@
-import { useEffect, useState } from 'react';
-import { useColorScheme as useRNColorScheme } from 'react-native';
+// Web intentionally uses a deterministic initial theme.
+//
+// React Native color-scheme hydration can differ between
+// server rendering and the first client render.
+//
+// The production mobile application will use the native
+// color-scheme implementation. Our full theme system will
+// be introduced with the design-system phase.
 
-/**
- * To support static rendering, this value needs to be re-calculated on the client side for web
- */
 export function useColorScheme() {
-  const [hasHydrated, setHasHydrated] = useState(false);
-
-  useEffect(() => {
-    setHasHydrated(true);
-  }, []);
-
-  const colorScheme = useRNColorScheme();
-
-  if (hasHydrated) {
-    return colorScheme;
-  }
-
-  return 'light';
+  return 'light' as const;
 }
