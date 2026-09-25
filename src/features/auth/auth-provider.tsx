@@ -72,11 +72,6 @@ export function AuthProvider({
 
   const userId = session?.user.id ?? null;
 
-
-  // ----------------------------------------------------------
-  // Initial Supabase session
-  // ----------------------------------------------------------
-
   useEffect(() => {
     let mounted = true;
 
@@ -109,20 +104,10 @@ export function AuthProvider({
 
     void loadInitialSession();
 
-
-    // --------------------------------------------------------
-    // Auth event subscription
-    // --------------------------------------------------------
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
       (event, nextSession) => {
-        // Keep this callback synchronous.
-        //
-        // Database/profile work is intentionally performed
-        // by the separate profile-loading effect below.
-
         setSession(nextSession);
         setError(null);
 
@@ -142,11 +127,6 @@ export function AuthProvider({
       subscription.unsubscribe();
     };
   }, []);
-
-
-  // ----------------------------------------------------------
-  // Native session refresh lifecycle
-  // ----------------------------------------------------------
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -175,11 +155,6 @@ export function AuthProvider({
       void supabase.auth.stopAutoRefresh();
     };
   }, []);
-
-
-  // ----------------------------------------------------------
-  // Load profile when authenticated user changes
-  // ----------------------------------------------------------
 
   useEffect(() => {
     if (!sessionLoaded || !userId) {
@@ -219,11 +194,6 @@ export function AuthProvider({
     userId,
   ]);
 
-
-  // ----------------------------------------------------------
-  // Explicit profile refresh
-  // ----------------------------------------------------------
-
   const refreshProfile =
     useCallback(async (): Promise<void> => {
       if (!userId) {
@@ -247,31 +217,19 @@ export function AuthProvider({
       }
     }, [userId]);
 
-
-  // ----------------------------------------------------------
-  // Current-device sign out
-  // ----------------------------------------------------------
-
   const signOut =
     useCallback(async (): Promise<void> => {
       await signOutCurrentSession();
     }, []);
 
-
-  // ----------------------------------------------------------
-  // Derived authentication state
-  // ----------------------------------------------------------
-
   const profileBelongsToSession =
     profile !== null &&
     profile.user_id === userId;
-
 
   const activeProfile =
     profileBelongsToSession
       ? profile
       : null;
-
 
   const isReady =
     sessionLoaded &&
@@ -284,26 +242,18 @@ export function AuthProvider({
       profileStatus === 'error'
     );
 
-
   const value = useMemo(
     () => ({
       session,
-
-      profile:
-        activeProfile,
-
+      profile: activeProfile,
       isReady,
-
       isAuthenticated:
         session !== null,
-
       needsOnboarding:
         session !== null &&
         activeProfile !== null &&
         activeProfile.onboarding_completed !== true,
-
       error,
-
       refreshProfile,
       signOut,
     }),
@@ -316,7 +266,6 @@ export function AuthProvider({
       signOut,
     ],
   );
-
 
   return (
     <AuthContext.Provider value={value}>
