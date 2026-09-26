@@ -396,6 +396,31 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_account: {
+        Args: {
+          p_account_id?: string
+          p_account_type_code: string
+          p_currency_code: string
+          p_name: string
+          p_opening_balance_minor?: string
+        }
+        Returns: string
+      }
+      create_financial_transaction: {
+        Args: {
+          p_account_id: string
+          p_amount_minor: string
+          p_category_id: string
+          p_client_operation_id?: string
+          p_description?: string
+          p_merchant?: string
+          p_notes?: string
+          p_transaction_date?: string
+          p_transaction_id?: string
+          p_type: Database["public"]["Enums"]["transaction_type"]
+        }
+        Returns: string
+      }
       create_transfer: {
         Args: {
           p_client_operation_id?: string
@@ -413,6 +438,43 @@ export type Database = {
       get_account_balance_minor: {
         Args: { p_account_id: string }
         Returns: number
+      }
+      get_account_summaries: {
+        Args: never
+        Returns: {
+          account_type_code: string
+          balance_class: Database["public"]["Enums"]["account_balance_class"]
+          currency_code: string
+          currency_minor_unit: number
+          current_balance_minor: string
+          id: string
+          name: string
+          opening_balance_minor: string
+          status: Database["public"]["Enums"]["account_status"]
+        }[]
+      }
+      get_recent_activity: {
+        Args: { p_limit?: number }
+        Returns: {
+          account_id: string
+          account_name: string
+          amount_minor: string
+          category_id: string
+          category_name: string
+          created_at: string
+          currency_code: string
+          currency_minor_unit: number
+          description: string
+          destination_account_id: string
+          destination_account_name: string
+          destination_amount_minor: string
+          destination_currency_code: string
+          destination_currency_minor_unit: number
+          id: string
+          merchant: string
+          transaction_date: string
+          type: Database["public"]["Enums"]["transaction_type"]
+        }[]
       }
     }
     Enums: {

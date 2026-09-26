@@ -1,16 +1,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {
-  StyleSheet,
-  Text,
-  View,
-  Pressable,
-  ActivityIndicator,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import {
   useEffect,
   useState,
 } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/app-button';
 import { BrandMark } from '@/components/ui/brand-mark';
@@ -144,6 +145,15 @@ export default function SetupScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingBottom: 32,
+        }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.outer}>
         <BrandMark />
 
@@ -337,6 +347,7 @@ export default function SetupScreen() {
           </Text>
         </View>
       </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
