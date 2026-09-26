@@ -1,3 +1,4 @@
+import { SyncBootstrap } from '../../../offline/sync/sync-bootstrap';
 import { Stack } from 'expo-router';
 
 import {
@@ -12,6 +13,7 @@ export default function FinanceLayout() {
   return (
     <LocalDatabaseProvider>
       <FinanceProvider>
+        <SyncBootstrap />
         <Stack
           screenOptions={{
             headerShown: false,

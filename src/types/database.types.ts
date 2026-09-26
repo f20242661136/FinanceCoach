@@ -75,6 +75,7 @@ export type Database = {
           id: string
           name: string
           opening_balance_minor: number
+          server_revision: number
           sort_order: number
           status: Database["public"]["Enums"]["account_status"]
           updated_at: string
@@ -90,6 +91,7 @@ export type Database = {
           id?: string
           name: string
           opening_balance_minor?: number
+          server_revision: number
           sort_order?: number
           status?: Database["public"]["Enums"]["account_status"]
           updated_at?: string
@@ -105,6 +107,7 @@ export type Database = {
           id?: string
           name?: string
           opening_balance_minor?: number
+          server_revision?: number
           sort_order?: number
           status?: Database["public"]["Enums"]["account_status"]
           updated_at?: string
@@ -137,6 +140,7 @@ export type Database = {
           id: string
           is_system: boolean
           kind: Database["public"]["Enums"]["category_kind"]
+          server_revision: number
           sort_order: number
           system_key: string | null
           translation_key: string | null
@@ -152,6 +156,7 @@ export type Database = {
           id?: string
           is_system?: boolean
           kind: Database["public"]["Enums"]["category_kind"]
+          server_revision: number
           sort_order?: number
           system_key?: string | null
           translation_key?: string | null
@@ -167,6 +172,7 @@ export type Database = {
           id?: string
           is_system?: boolean
           kind?: Database["public"]["Enums"]["category_kind"]
+          server_revision?: number
           sort_order?: number
           system_key?: string | null
           translation_key?: string | null
@@ -475,6 +481,15 @@ export type Database = {
           transaction_date: string
           type: Database["public"]["Enums"]["transaction_type"]
         }[]
+      }
+      get_sync_delta: {
+        Args: {
+          p_account_after?: string
+          p_category_after?: string
+          p_limit?: number
+          p_transaction_after?: string
+        }
+        Returns: Json
       }
     }
     Enums: {

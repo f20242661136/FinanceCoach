@@ -1,7 +1,7 @@
 export const LOCAL_DATABASE_NAME =
-  'finance-coach.db';
+  'finance-coach-secure.db';
 
-export const LOCAL_SCHEMA_VERSION = 1;
+export const LOCAL_SCHEMA_VERSION = 2;
 
 export const LOCAL_TABLES = [
   'local_accounts',
