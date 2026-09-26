@@ -2,6 +2,12 @@ import type {
   SQLiteDatabase,
 } from 'expo-sqlite';
 
+import {
+  withEncryptedWriteTransaction,
+} from '../database/encrypted-writer';
+
+
+
 import type {
   SyncCursors,
   SyncDelta,
@@ -106,14 +112,13 @@ getLocalSyncCursors(
 
 export async function
 applySyncDelta(
-  db: SQLiteDatabase,
   userId: string,
   delta: SyncDelta,
 ): Promise<void> {
   const now =
     new Date().toISOString();
 
-  await db.withExclusiveTransactionAsync(
+  await withEncryptedWriteTransaction(
     async (tx) => {
       for (
         const account

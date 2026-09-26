@@ -2,8 +2,7 @@ import type {
   SQLiteDatabase,
 } from 'expo-sqlite';
 import {
-  LOCAL_TABLES,
-  LOCAL_SCHEMA_VERSION,
+  LOCAL_TABLES
 } from './constants';
 import {
   getLocalDatabaseKey,
@@ -359,12 +358,13 @@ export async function migrateLocalDatabase(
     );
   }
 
-
-  /*
-   * SQLCipher keying must happen before
-   * any access to the encrypted database.
-   */
   try {
+    /*
+     * Raw 256-bit SQLCipher key.
+     *
+     * This MUST be the first operation
+     * performed on the database connection.
+     */
     await db.execAsync(
       `PRAGMA key = "x'${databaseKey}'";`,
     );
@@ -377,7 +377,6 @@ export async function migrateLocalDatabase(
       }`,
     );
   }
-
 
   try {
     const cipher =
@@ -397,6 +396,7 @@ export async function migrateLocalDatabase(
       '[local-db] SQLCipher',
       cipher.cipher_version,
     );
+    
   } catch (error) {
     throw new Error(
       `[local-db:cipher-version] ${
@@ -407,11 +407,12 @@ export async function migrateLocalDatabase(
     );
   }
 
-
   /*
-   * Force a real database read after
-   * applying the key.
+   * Force an actual database read after
+   * keying. PRAGMA key itself does not
+   * prove that database access succeeds.
    */
+  
   try {
     await db.getFirstAsync(
       `
@@ -429,7 +430,6 @@ export async function migrateLocalDatabase(
     );
   }
 
-
   try {
     await db.execAsync(`
       PRAGMA journal_mode = WAL;
@@ -445,131 +445,4 @@ export async function migrateLocalDatabase(
       }`,
     );
   }
-
-
-  const versionRow =
-    await db.getFirstAsync<{
-      user_version: number;
-    }>(
-      'PRAGMA user_version',
-    );
-
-  let currentVersion =
-    versionRow?.user_version ?? 0;
-
-  if (
-    !Number.isInteger(
-      currentVersion,
-    )
-    || currentVersion < 0
-  ) {
-    throw new Error(
-      'Local database has an invalid schema version.',
-    );
-  }
-
-
-  if (
-    currentVersion >
-    LOCAL_SCHEMA_VERSION
-  ) {
-    throw new Error(
-      `Local database schema version ${currentVersion} is newer than supported version ${LOCAL_SCHEMA_VERSION}.`,
-    );
-  }
-
-
-  /*
-   * Fresh database:
-   * build the complete v1 foundation.
-   */
-  if (currentVersion < 1) {
-    console.log(
-      '[local-db] applying schema v1',
-    );
-
-    await db.withTransactionAsync(
-      async () => {
-        await db.execAsync(
-          SCHEMA_V1,
-        );
-      },
-    );
-
-    currentVersion = 1;
-  }
-
-
-  /*
-   * Upgrade existing v1 databases.
-   *
-   * SCHEMA_V2 uses CREATE TABLE IF NOT EXISTS,
-   * so it also safely repairs the sync tables
-   * from early Gate 5 development databases.
-   */
-  if (currentVersion < 2) {
-    console.log(
-      '[local-db] applying schema v2',
-    );
-
-    await db.withTransactionAsync(
-      async () => {
-        await db.execAsync(
-          SCHEMA_V2,
-        );
-
-        await db.execAsync(
-          'PRAGMA user_version = 2;',
-        );
-      },
-    );
-
-    currentVersion = 2;
-  }
-
-
-  if (
-    currentVersion !==
-    LOCAL_SCHEMA_VERSION
-  ) {
-    throw new Error(
-      `Local database migration stopped at version ${currentVersion}; expected ${LOCAL_SCHEMA_VERSION}.`,
-    );
-  }
-
-
-  /*
-   * Never consider migration successful
-   * unless every required table exists.
-   */
-  await assertSchema(
-    db,
-  );
-
-
-  /*
-   * If Android terminated the process while
-   * a queued mutation was marked processing,
-   * make it eligible for a future retry.
-   */
-  await db.runAsync(
-    `
-      UPDATE sync_queue
-
-      SET
-        status = 'pending',
-        next_attempt_at = NULL,
-        updated_at = ?
-
-      WHERE
-        status = 'processing'
-    `,
-    new Date().toISOString(),
-  );
-
-
-  console.log(
-    '[local-db] schema ready',
-    currentVersion,
-  );
 }

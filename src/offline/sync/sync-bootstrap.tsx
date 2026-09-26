@@ -3,20 +3,16 @@ import {
 } from 'react';
 
 import {
+  useQueryClient,
+} from '@tanstack/react-query';
+
+import {
   useSQLiteContext,
 } from 'expo-sqlite';
 
 import {
-  supabase,
-} from '../../lib/supabase';
-
-import {
-  getLocalSyncDiagnostics,
-} from './sync-repository';
-
-import {
-  syncFromServer,
-} from './sync-service';
+  refreshLocalFinance,
+} from './sync-refresh';
 
 
 function errorMessage(
@@ -36,62 +32,25 @@ export function SyncBootstrap() {
   const db =
     useSQLiteContext();
 
+  const queryClient =
+    useQueryClient();
+
 
   useEffect(() => {
     let cancelled = false;
 
 
     async function run() {
-      const {
-        data: {
-          session,
-        },
-        error,
-      } =
-        await supabase.auth
-          .getSession();
-
-
-      if (error) {
-        console.warn(
-          '[sync] Could not read session:',
-          error.message,
-        );
-
-        return;
-      }
-
-
-      const userId =
-        session?.user.id;
-
-      if (
-        !userId
-        || cancelled
-      ) {
-        return;
-      }
-
-
       try {
         const result =
-          await syncFromServer(
+          await refreshLocalFinance(
             db,
-            userId,
+            queryClient,
           );
-
 
         if (cancelled) {
           return;
         }
-
-
-        const diagnostics =
-          await getLocalSyncDiagnostics(
-            db,
-            userId,
-          );
-
 
         console.log(
           '[sync] bootstrap complete',
@@ -101,27 +60,19 @@ export function SyncBootstrap() {
 
             received:
               result.received,
-
-            localCounts:
-              diagnostics.counts,
-
-            cursors:
-              diagnostics.cursors,
           },
         );
-      } catch (syncError) {
+      } catch (error) {
         /*
-         * Bootstrap sync is intentionally
-         * non-fatal.
-         *
-         * Network loss must not prevent the
-         * finance shell from rendering.
+         * Local reads remain usable.
+         * Failed network refresh must
+         * never block the finance UI.
          */
         if (!cancelled) {
           console.warn(
             '[sync] bootstrap deferred:',
             errorMessage(
-              syncError,
+              error,
             ),
           );
         }
@@ -135,7 +86,10 @@ export function SyncBootstrap() {
     return () => {
       cancelled = true;
     };
-  }, [db]);
+  }, [
+    db,
+    queryClient,
+  ]);
 
 
   return null;

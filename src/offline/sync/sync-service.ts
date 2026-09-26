@@ -161,7 +161,6 @@ async function performSync(
 
 
     await applySyncDelta(
-      db,
       userId,
       delta,
     );
