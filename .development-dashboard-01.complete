@@ -1,0 +1,19 @@
+Dashboard Intelligence development script 01 completed.
+
+Scope:
+- authoritative dashboard summary RPC
+- monthly income / expense / net grouped by currency
+- savings-rate basis points grouped by currency
+- ledger-derived active account balances grouped by currency
+- current budget alert counts
+- savings-goal progress counts
+- monthly activity facts
+- no cross-currency aggregation
+- no transfer-as-income/expense mistakes
+- Zod contract
+- bound Supabase service adapter
+- TanStack Query hook
+- deterministic display helpers
+
+No tests were run.
+Run Dashboard development script 02 before validation.

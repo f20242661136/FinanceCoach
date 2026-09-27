@@ -1,0 +1,6 @@
+Finance Coach development/security audit remediation
+Step 24: ROSCA detail RPC volatility correction
+Migration: supabase/migrations/20260926181500_rosca_detail_volatility_fix.sql
+Regression: supabase/tests/database/011_rosca_detail_volatility_regression.test.sql
+Cause: get_rosca_group_detail(uuid) was STABLE while calling an UPDATE-capable lifecycle helper.
+Fix: mark the RPC VOLATILE so PostgREST uses a read-write transaction.

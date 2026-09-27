@@ -1,0 +1,29 @@
+Gamification development script 01 completed.
+
+Scope:
+- centralized point-rule configuration
+- centralized level thresholds
+- point_events source-of-truth ledger
+- user_points derived/cached total
+- badges and user_badges
+- daily logging, saving and challenge streaks
+- IANA timezone validation
+- server-side streak recomputation
+- idempotent streak milestone rewards
+- configurable daily/weekly challenges
+- user challenge periods and progress
+- challenge completion verified from trusted app data
+- database triggers for transaction/budget/goal/savings events
+- goal-completion event award
+- idempotent challenge completion award
+- badge evaluation
+- consolidated gamification summary RPC
+- RLS read isolation
+- no client permission to create arbitrary point events
+- TypeScript/Zod contracts
+- service + TanStack Query layer
+
+Initial level thresholds and point values are centralized defaults, not scattered UI logic.
+
+No tests were run.
+Run Gamification development script 02 before validation.

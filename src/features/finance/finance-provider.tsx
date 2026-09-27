@@ -1,4 +1,8 @@
 import {
+  NotificationRuntime,
+} from '../notifications/notification-runtime';
+
+import {
   type PropsWithChildren,
   useEffect,
   useRef,
@@ -53,6 +57,7 @@ export function FinanceProvider({
     <QueryClientProvider
       client={queryClient}
     >
+      <NotificationRuntime />
       {children}
     </QueryClientProvider>
   );

@@ -1,0 +1,31 @@
+AI Coach development script 01 completed.
+
+Scope:
+- ai_conversations
+- ai_messages
+- financial_insights
+- RLS read isolation
+- safe conversation create/archive RPCs
+- conversation/message/insight read RPCs
+- trusted aggregated AI financial context RPC
+- current vs previous month income/expense summaries
+- currency-separated financial summaries
+- savings rate in deterministic basis points
+- category spending breakdown
+- current budget status
+- reconstructable savings-goal progress
+- loan summary without counterparty exposure
+- recent behavior summary
+- raw transaction/merchant/account-number exclusion
+- TypeScript/Zod AI contracts
+- structured Fact / Observation / Suggestion / Education / Caution response model
+- service + TanStack Query foundation
+- explicit server-side AI policy document
+
+Money remains integer minor-unit strings.
+Different currencies are never combined.
+The mobile client cannot write assistant messages or generated insights directly.
+No LLM provider is called by this script.
+
+No tests were run.
+Run AI Coach development script 02 before validation.

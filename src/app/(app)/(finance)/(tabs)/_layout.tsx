@@ -2,8 +2,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
 
 import {
-  financeColors,
-} from '@/features/finance/finance-ui';
+  colors,
+  layout,
+  typography,
+} from '@/design/tokens';
 
 export default function FinanceTabs() {
   return (
@@ -13,25 +15,25 @@ export default function FinanceTabs() {
         headerShown: false,
 
         tabBarActiveTintColor:
-          financeColors.primary,
+          colors.primary,
 
         tabBarInactiveTintColor:
-          financeColors.textMuted,
+          colors.textSecondary,
 
         tabBarStyle: {
           borderTopColor:
-            financeColors.border,
+            colors.border,
 
           backgroundColor:
-            financeColors.surface,
+            colors.surface,
 
-          height: 66,
+          height: layout.tabBarHeight,
           paddingTop: 7,
           paddingBottom: 7,
         },
 
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: typography.caption,
           fontWeight: '600',
         },
       }}

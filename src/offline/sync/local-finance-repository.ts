@@ -14,6 +14,7 @@ export type LocalAccountSummary = {
   current_balance_minor: string;
   status: string;
   server_revision: string;
+  sync_status: string;
   server_updated_at: string | null;
 };
 
@@ -47,6 +48,7 @@ export type LocalActivityItem = {
 
   version: number;
   server_revision: string;
+  sync_status: string;
 
   created_at: string;
   updated_at: string;
@@ -77,6 +79,7 @@ listLocalAccountSummaries(
         opening_balance_minor,
         current_balance_minor,
         status,
+        sync_status,
         server_revision,
         server_updated_at
 
@@ -149,6 +152,7 @@ listLocalRecentActivity(
 
         t.version,
         t.server_revision,
+        t.sync_status,
         t.created_at,
         t.updated_at
 

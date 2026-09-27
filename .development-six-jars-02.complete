@@ -1,0 +1,20 @@
+Six-Jar development script 02 completed.
+
+Scope:
+- active-code uniqueness compatible with soft deletion
+- exact minor-unit allocation reconciliation
+- Six-Jar overview
+- configurable setup/edit flow
+- classic 55/10/10/10/10/5 starting split
+- profile currency selection
+- percentage-total indicator
+- server-backed allocation calculator
+- planning-only money language
+- Home Six-Jar card
+- Expo Router routes
+- UTF-8-safe Home integration
+
+No tests were run by this script.
+
+Both Six-Jar development scripts are complete.
+The next step is interactive validation, not another PS1 file.

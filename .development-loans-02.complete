@@ -1,0 +1,25 @@
+Loans development script 02 completed.
+
+Scope:
+- loans list
+- borrowed/given visual distinction
+- create loan flow
+- currency-aware principal input
+- optional interest metadata
+- optional payment schedule metadata
+- loan detail
+- remaining/principal/paid summary
+- overdue state
+- payment history
+- payment entry
+- overpayment client guard
+- full-remaining payment shortcut
+- explicit planning/history-only account-ledger disclosure
+- Home Loans card
+- Expo Router routes
+- UTF-8-safe Home integration
+
+No tests were run.
+
+Both Loans development scripts are complete.
+Next step: interactive validation only.

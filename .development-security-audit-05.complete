@@ -1,0 +1,5 @@
+Finance Coach development/security audit remediation
+Step 23: dashboard account archive schema correction
+Migration: supabase/migrations/20260926175000_dashboard_account_archive_fix.sql
+Regression: supabase/tests/database/010_dashboard_account_archive_regression.test.sql
+Source definition: 20260926094500_dashboard_budget_period_fix.sql

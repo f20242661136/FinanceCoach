@@ -40,7 +40,8 @@
         {
           "useSQLCipher": true
         }
-      ]
+      ],
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,

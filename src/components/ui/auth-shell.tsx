@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   colors,
   layout,
+  radii,
   spacing,
   typography,
 } from '@/design/tokens';
@@ -113,7 +114,7 @@ const styles = StyleSheet.create({
   eyebrow: {
     color: colors.success,
     fontSize: typography.small,
-    fontWeight: '800',
+    fontWeight: typography.weightExtraBold,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
@@ -121,7 +122,7 @@ const styles = StyleSheet.create({
   title: {
     color: colors.text,
     fontSize: typography.title,
-    lineHeight: 40,
+    lineHeight: typography.lineHeightTitle,
     fontWeight: '800',
     letterSpacing: -0.8,
   },
@@ -129,14 +130,14 @@ const styles = StyleSheet.create({
   subtitle: {
     color: colors.textSecondary,
     fontSize: typography.body,
-    lineHeight: 24,
+    lineHeight: typography.lineHeightBody,
   },
 
   card: {
     padding: spacing.lg,
     gap: spacing.md,
     backgroundColor: colors.surface,
-    borderRadius: 24,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.border,
   },

@@ -1,0 +1,41 @@
+Notifications development script 01 completed.
+
+Scope:
+- notification_preferences
+- notification_devices
+- scheduled_notifications
+- notification_events
+- RLS isolation
+- master notification switch
+- push / in-app switches
+- IANA timezone storage
+- quiet hours
+- reminder-time preferences
+- budget warning threshold
+- individual category toggles
+- Expo push-token registration RPC
+- token deactivation RPC
+- deterministic deduplicated scheduling
+- loan due reminders
+- ROSCA contribution reminders
+- challenge reminders
+- streak reminders
+- AI insight reminders
+- savings check-ins
+- budget warnings from trusted financial data
+- recurring bill reminders when recurring_transactions is available
+- optional motivational reminders, disabled by default
+- generic lock-screen copy without sensitive financial amounts
+- authenticated schedule refresh
+- service-role all-user schedule refresh
+- notification center read model
+- opened-event audit
+- TypeScript/Zod contracts
+- service + TanStack Query layer
+- architecture documentation
+
+No Expo native package was installed yet.
+No push delivery is performed yet.
+No tests were run.
+
+Run Notifications development script 02 before validation.

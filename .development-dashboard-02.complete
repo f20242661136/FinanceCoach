@@ -1,0 +1,19 @@
+Dashboard Intelligence development script 02 completed.
+
+Scope:
+- corrected budget-period calculations for monthly/annual/custom budgets
+- command-center Home component
+- per-currency monthly income / expenses / net
+- per-currency ledger-derived active account balances
+- no cross-currency grand total
+- budget warning signal
+- savings goal signal
+- monthly transaction activity signal
+- quick transaction and transfer actions
+- dashboard/budget/goal invalidation after authoritative sync
+- UTF-8-safe Home integration
+
+No tests were run by this script.
+
+Both Dashboard development scripts are now complete.
+The next step is the scheduled validation cycle.

@@ -1,0 +1,19 @@
+Six-Jar development script 01 completed.
+
+Scope:
+- six_jar_profiles
+- six_jar_categories
+- six_jar_allocations history table
+- RLS isolation
+- configurable jar definitions
+- server validation that percentages total exactly 100%
+- basis-point percentages
+- deterministic suggested allocation RPC
+- no automatic ledger/account mutation
+- profile fetch/save service
+- allocation calculation service
+- TanStack Query hooks
+- percentage formatting/parsing helpers
+
+No tests were run.
+Run Six-Jar development script 02 before validation.

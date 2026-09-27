@@ -8,7 +8,7 @@ export const copy = {
     continue: 'Continue',
     retry: 'Try again',
     signOut: 'Sign out',
-    loading: 'Loading your secure workspaceâ€¦',
+    loading: 'Loading your secure workspace…',
     privateByDesign: 'Private by design',
   },
 
@@ -83,7 +83,7 @@ export const copy = {
     locale: 'Locale',
     timezone: 'Timezone',
     continue: 'Finish setup',
-    loadingCurrencies: 'Loading supported currenciesâ€¦',
+    loadingCurrencies: 'Loading supported currencies…',
     noCurrencies:
       'Supported currencies could not be loaded.',
     privacy:
@@ -102,7 +102,7 @@ export const copy = {
       'Your account is isolated from other users at the database level.',
     correctnessTitle: 'Built for financial correctness',
     correctnessBody:
-      'Balances will come from the ledgerâ€”not from editable dashboard numbers.',
+      'Balances will come from the ledger—not from editable dashboard numbers.',
     nextTitle: 'Next build gate',
     nextBody:
       'Accounts, transaction entry, and the first real financial dashboard.',

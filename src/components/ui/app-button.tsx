@@ -1,3 +1,5 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+
 import {
   ActivityIndicator,
   Pressable,
@@ -19,7 +21,8 @@ import {
 type ButtonVariant =
   | 'primary'
   | 'secondary'
-  | 'ghost';
+  | 'ghost'
+  | 'danger';
 
 type AppButtonProps = Omit<
   PressableProps,
@@ -29,6 +32,7 @@ type AppButtonProps = Omit<
   variant?: ButtonVariant;
   loading?: boolean;
   fullWidth?: boolean;
+  icon?: keyof typeof Ionicons.glyphMap;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -36,6 +40,7 @@ export function AppButton({
   label,
   variant = 'primary',
   loading = false,
+  icon,
   disabled,
   fullWidth = true,
   style,
@@ -60,13 +65,20 @@ export function AppButton({
           styles.secondary,
         variant === 'ghost' &&
           styles.ghost,
+        variant === 'danger' &&
+          styles.danger,
         pressed &&
           !isDisabled &&
           variant === 'primary' &&
           styles.primaryPressed,
         pressed &&
           !isDisabled &&
+          variant === 'danger' &&
+          styles.dangerPressed,
+        pressed &&
+          !isDisabled &&
           variant !== 'primary' &&
+          variant !== 'danger' &&
           styles.neutralPressed,
         isDisabled && styles.disabled,
         style,
@@ -78,21 +90,38 @@ export function AppButton({
           size="small"
           color={
             variant === 'primary'
-              ? colors.white
+              || variant === 'danger'
+              ? colors.textOnPrimary
               : colors.primary
           }
         />
       ) : (
-        <Text
-          style={[
-            styles.label,
-            variant === 'primary'
-              ? styles.primaryLabel
-              : styles.neutralLabel,
-          ]}
-        >
-          {label}
-        </Text>
+        <>
+          {icon ? (
+            <Ionicons
+              name={icon}
+              size={18}
+              color={
+                variant === 'primary'
+                  || variant === 'danger'
+                  ? colors.textOnPrimary
+                  : colors.primary
+              }
+            />
+          ) : null}
+
+          <Text
+            style={[
+              styles.label,
+              variant === 'primary'
+                || variant === 'danger'
+                ? styles.primaryLabel
+                : styles.neutralLabel,
+            ]}
+          >
+            {label}
+          </Text>
+        </>
       )}
     </Pressable>
   );
@@ -106,6 +135,8 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
     borderWidth: 1,
   },
 
@@ -126,6 +157,15 @@ const styles = StyleSheet.create({
   secondary: {
     backgroundColor: colors.surface,
     borderColor: colors.borderStrong,
+  },
+
+  danger: {
+    backgroundColor: colors.danger,
+    borderColor: colors.danger,
+  },
+
+  dangerPressed: {
+    opacity: 0.86,
   },
 
   ghost: {

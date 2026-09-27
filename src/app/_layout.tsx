@@ -15,6 +15,9 @@ import {
 import {
   ProfileErrorScreen,
 } from '@/components/ui/profile-error-screen';
+import {
+  SubscriptionProvider,
+} from '@/features/subscriptions/subscription-provider';
 
 function RootNavigator() {
   const {
@@ -85,7 +88,9 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootNavigator />
+      <SubscriptionProvider>
+        <RootNavigator />
+      </SubscriptionProvider>
     </AuthProvider>
   );
 }

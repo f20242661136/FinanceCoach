@@ -28,6 +28,9 @@ useLocalFinanceSync() {
   const refreshMutation =
     useRefreshLocalFinance();
 
+  const refreshLocalFinance =
+    refreshMutation.mutateAsync;
+
   const [
     refreshError,
     setRefreshError,
@@ -41,8 +44,7 @@ useLocalFinanceSync() {
     useCallback(
       async (): Promise<boolean> => {
         try {
-          await refreshMutation
-            .mutateAsync();
+          await refreshLocalFinance();
 
           setRefreshError(
             null,
@@ -60,8 +62,7 @@ useLocalFinanceSync() {
         }
       },
       [
-        refreshMutation
-          .mutateAsync,
+        refreshLocalFinance,
       ],
     );
 
@@ -73,8 +74,7 @@ useLocalFinanceSync() {
 
       async function run() {
         try {
-          await refreshMutation
-            .mutateAsync();
+          await refreshLocalFinance();
 
           if (active) {
             setRefreshError(
@@ -98,8 +98,7 @@ useLocalFinanceSync() {
         active = false;
       };
     }, [
-      refreshMutation
-        .mutateAsync,
+      refreshLocalFinance,
     ]),
   );
 

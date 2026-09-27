@@ -1,6 +1,12 @@
 import {
+  useCallback,
   useEffect,
+  useRef,
 } from 'react';
+
+import {
+  AppState,
+} from 'react-native';
 
 import {
   useQueryClient,
@@ -15,12 +21,14 @@ import {
 } from './sync-refresh';
 
 
+const MIN_RESUME_INTERVAL_MS =
+  3000;
+
+
 function errorMessage(
   error: unknown,
 ): string {
-  if (
-    error instanceof Error
-  ) {
+  if (error instanceof Error) {
     return error.message;
   }
 
@@ -35,60 +43,97 @@ export function SyncBootstrap() {
   const queryClient =
     useQueryClient();
 
+  const mountedRef =
+    useRef(true);
 
-  useEffect(() => {
-    let cancelled = false;
+  const lastRunAtRef =
+    useRef(0);
 
 
-    async function run() {
-      try {
-        const result =
-          await refreshLocalFinance(
-            db,
-            queryClient,
-          );
+  const run =
+    useCallback(
+      async () => {
+        const now =
+          Date.now();
 
-        if (cancelled) {
+        if (
+          now
+          - lastRunAtRef.current
+          < MIN_RESUME_INTERVAL_MS
+        ) {
           return;
         }
 
-        console.log(
-          '[sync] bootstrap complete',
-          {
-            pages:
-              result.pages,
+        lastRunAtRef.current =
+          now;
 
-            received:
-              result.received,
-          },
-        );
-      } catch (error) {
-        /*
-         * Local reads remain usable.
-         * Failed network refresh must
-         * never block the finance UI.
-         */
-        if (!cancelled) {
-          console.warn(
-            '[sync] bootstrap deferred:',
-            errorMessage(
-              error,
-            ),
-          );
+        try {
+          const result =
+            await refreshLocalFinance(
+              db,
+              queryClient,
+            );
+
+          if (
+            mountedRef.current
+          ) {
+            console.log(
+              '[sync] refresh complete',
+              {
+                pages:
+                  result.pages,
+
+                received:
+                  result.received,
+              },
+            );
+          }
+        } catch (error) {
+          if (
+            mountedRef.current
+          ) {
+            console.warn(
+              '[sync] refresh deferred:',
+              errorMessage(
+                error,
+              ),
+            );
+          }
         }
-      }
-    }
+      },
+      [
+        db,
+        queryClient,
+      ],
+    );
 
+
+  useEffect(() => {
+    mountedRef.current =
+      true;
 
     void run();
 
+    const subscription =
+      AppState.addEventListener(
+        'change',
+        (state) => {
+          if (
+            state === 'active'
+          ) {
+            void run();
+          }
+        },
+      );
 
     return () => {
-      cancelled = true;
+      mountedRef.current =
+        false;
+
+      subscription.remove();
     };
   }, [
-    db,
-    queryClient,
+    run,
   ]);
 
 

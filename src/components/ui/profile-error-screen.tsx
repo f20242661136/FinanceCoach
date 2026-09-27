@@ -117,20 +117,20 @@ const styles = StyleSheet.create({
   title: {
     color: colors.text,
     fontSize: typography.heading,
-    fontWeight: '800',
-    lineHeight: 30,
+    fontWeight: typography.weightExtraBold,
+    lineHeight: typography.lineHeightHeading,
   },
 
   body: {
     color: colors.textSecondary,
     fontSize: typography.body,
-    lineHeight: 24,
+    lineHeight: typography.lineHeightBody,
   },
 
   detail: {
     color: colors.danger,
     fontSize: typography.small,
-    lineHeight: 20,
+    lineHeight: typography.lineHeightSmall,
   },
 
   actions: {

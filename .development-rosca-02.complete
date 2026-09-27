@@ -1,0 +1,24 @@
+ROSCA development script 02 completed.
+
+Scope:
+- retry-safe join for existing membership
+- auth UUIDs removed from ROSCA detail payload
+- cycle status automatically scheduled/open/closed
+- group automatically completes after all cycles close
+- ROSCA group list UI
+- create group UI
+- join by invite code UI
+- detail screen
+- payout-order member list
+- planned vs paid contribution display
+- member/owner contribution payment action
+- owner payout payment action
+- explicit ledger-separation disclosure
+- Home ROSCA card
+- Expo Router routes
+- UTF-8-safe Home integration
+
+No tests were run.
+
+Both ROSCA development scripts are complete.
+Next step: interactive validation only.

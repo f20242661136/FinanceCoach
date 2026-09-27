@@ -18,13 +18,27 @@ import {
 } from './local-finance-query';
 
 import {
+  replayQueuedMutations,
+} from './mutation-replay';
+
+import {
+  refreshFinanceReferenceData,
+} from './reference-data';
+
+import {
   syncFromServer,
   type SyncRunResult,
 } from './sync-service';
 
 
-async function
-requireUserId():
+const refreshesInFlight =
+  new Map<
+    string,
+    Promise<SyncRunResult>
+  >();
+
+
+async function requireUserId():
   Promise<string> {
   const {
     data: {
@@ -41,16 +55,68 @@ requireUserId():
     );
   }
 
-  const userId =
-    session?.user.id;
-
-  if (!userId) {
+  if (!session?.user.id) {
     throw new Error(
       'Authentication required.',
     );
   }
 
-  return userId;
+  return session.user.id;
+}
+
+
+async function performRefresh(
+  db: SQLiteDatabase,
+  queryClient: QueryClient,
+  userId: string,
+): Promise<SyncRunResult> {
+  await replayQueuedMutations(
+    db,
+    userId,
+  );
+
+  const result =
+    await syncFromServer(
+      db,
+      userId,
+    );
+
+  /*
+   * Reference data is small and global.
+   * A reference refresh failure must not
+   * invalidate an otherwise successful
+   * ledger sync.
+   */
+  try {
+    await refreshFinanceReferenceData();
+  } catch (error) {
+    console.warn(
+      '[sync] reference refresh deferred',
+      error,
+    );
+  }
+
+  await queryClient
+    .invalidateQueries({
+      queryKey:
+        localFinanceKeys.all,
+    });
+
+  await Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: ['dashboard'],
+    }),
+
+    queryClient.invalidateQueries({
+      queryKey: ['budgets'],
+    }),
+
+    queryClient.invalidateQueries({
+      queryKey: ['savings-goals'],
+    }),
+  ]);
+
+  return result;
 }
 
 
@@ -62,23 +128,33 @@ refreshLocalFinance(
   const userId =
     await requireUserId();
 
-  const result =
-    await syncFromServer(
-      db,
+  const existing =
+    refreshesInFlight.get(
       userId,
     );
 
-  /*
-   * SQLite has committed before this
-   * runs, so active screens re-read the
-   * newly hydrated local state.
-   */
-  await queryClient.invalidateQueries({
-    queryKey:
-      localFinanceKeys.all,
-  });
+  if (existing) {
+    return existing;
+  }
 
-  return result;
+  const run =
+    performRefresh(
+      db,
+      queryClient,
+      userId,
+    )
+      .finally(() => {
+        refreshesInFlight.delete(
+          userId,
+        );
+      });
+
+  refreshesInFlight.set(
+    userId,
+    run,
+  );
+
+  return run;
 }
 
 

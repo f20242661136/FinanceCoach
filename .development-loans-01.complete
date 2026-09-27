@@ -1,0 +1,29 @@
+Loans development script 01 completed.
+
+Scope:
+- loans table
+- loan_payments history table
+- borrowed and given directions
+- BIGINT minor-unit amounts
+- optional interest-rate metadata
+- optional payment schedule metadata
+- RLS ownership isolation
+- idempotent create_loan RPC
+- idempotent add_loan_payment RPC
+- overpayment prevention
+- automatic settled status when principal reaches zero
+- deterministic remaining-principal calculation
+- loan status RPC
+- payment history RPC
+- TypeScript/Zod contracts
+- bound Supabase service adapter
+- TanStack Query hooks
+- interest formatting helpers
+
+Important:
+- no automatic interest accrual was invented
+- loan payments do not mutate the account ledger
+- remaining balance is derived from principal minus payment history
+
+No tests were run.
+Run Loans development script 02 before validation.

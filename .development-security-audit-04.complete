@@ -1,0 +1,4 @@
+Dev Step 22 complete.
+Offline mutation replay transport exceptions now receive exponential retry scheduling.
+Malformed durable queue payloads remain permanent failures.
+Runtime validation still required.

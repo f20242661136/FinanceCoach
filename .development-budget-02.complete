@@ -1,0 +1,19 @@
+Budget development script 02 completed.
+
+Scope:
+- budgets list screen
+- visual progress states
+- over-budget treatment
+- pull-to-refresh
+- create budget screen
+- monthly / annual / custom period UI
+- overall / category-specific scope
+- currency selection
+- Home budget summary card
+- Expo Router routes
+- UTF-8-safe source patching
+
+No tests were run by this script.
+
+Both budget development scripts are now complete.
+The next step is the scheduled validation cycle.

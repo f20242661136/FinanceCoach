@@ -1,5 +1,44 @@
 import {
-  ActivityIndicator,
+  HomeNotificationsCard,
+} from '../notifications/home-notifications-card';
+
+import {
+  HomeAiCoachCard,
+} from '../ai-coach/home-ai-coach-card';
+
+import {
+  HomeGamificationCard,
+} from '../gamification/home-gamification-card';
+
+import {
+  HomeRoscaCard,
+} from '../rosca/home-rosca-card';
+
+import {
+  HomeLoansCard,
+} from '../loans/home-loans-card';
+
+import {
+  HomeSixJarCard,
+} from '../six-jars/home-six-jar-card';
+
+import {
+  DashboardCommandCenter,
+} from '../dashboard/dashboard-command-center';
+
+import {
+  HomeSavingsGoalCard,
+} from '../goals/home-savings-goal-card';
+
+import {
+  HomeBudgetCard,
+} from '../budgets/home-budget-card';
+
+import {
+  SyncQueueBanner,
+} from './sync-queue-banner';
+
+import {
   Pressable,
   RefreshControl,
   ScrollView,
@@ -21,20 +60,41 @@ import {
   useLocalFinanceData,
 } from '../../offline/sync/use-local-finance-data';
 
+import {
+  AppButton,
+} from '@/components/ui/app-button';
+import {
+  AppSectionHeader,
+} from '@/components/ui/app-section-header';
+import {
+  StatePanel,
+} from '@/components/ui/state-panel';
+import {
+  StatusChip,
+} from '@/components/ui/status-chip';
+import {
+  colors,
+  elevation,
+  layout,
+  radii,
+  spacing,
+  typography,
+} from '@/design/tokens';
+
 
 const palette = {
-  background: '#F5F7F3',
-  surface: '#FFFFFF',
-  surfaceMuted: '#EEF3ED',
-  text: '#172019',
-  textMuted: '#647069',
-  border: '#DDE5DC',
-  primary: '#245C45',
-  primaryPressed: '#1D4C39',
-  positive: '#1F6A48',
-  negative: '#A34343',
-  warningBackground: '#FFF7E8',
-  warningText: '#73551E',
+  background: colors.background,
+  surface: colors.surface,
+  surfaceMuted: colors.surfaceMuted,
+  text: colors.text,
+  textMuted: colors.textSecondary,
+  border: colors.border,
+  primary: colors.primary,
+  primaryPressed: colors.primaryPressed,
+  positive: colors.success,
+  negative: colors.danger,
+  warningBackground: colors.warningSurface,
+  warningText: colors.warning,
 };
 
 
@@ -62,7 +122,7 @@ function formatMinor(
       : value;
 
   if (!/^\d+$/.test(digits)) {
-    return `${currencyCode} â€”`;
+    return `${currencyCode} —`;
   }
 
   if (minorUnit > 0) {
@@ -241,27 +301,12 @@ function EmptyState({
   body: string;
 }) {
   return (
-    <View
-      style={
-        styles.emptyCard
-      }
-    >
-      <Text
-        style={
-          styles.emptyTitle
-        }
-      >
-        {title}
-      </Text>
-
-      <Text
-        style={
-          styles.emptyBody
-        }
-      >
-        {body}
-      </Text>
-    </View>
+    <StatePanel
+      title={title}
+      description={body}
+      icon="wallet-outline"
+      tone="info"
+    />
   );
 }
 
@@ -274,29 +319,10 @@ function SectionHeading({
   supportingText?: string;
 }) {
   return (
-    <View
-      style={
-        styles.sectionHeading
-      }
-    >
-      <Text
-        style={
-          styles.sectionTitle
-        }
-      >
-        {title}
-      </Text>
-
-      {supportingText ? (
-        <Text
-          style={
-            styles.sectionSupporting
-          }
-        >
-          {supportingText}
-        </Text>
-      ) : null}
-    </View>
+    <AppSectionHeader
+      title={title}
+      subtitle={supportingText}
+    />
   );
 }
 
@@ -309,31 +335,11 @@ function PrimaryAction({
   onPress: () => void;
 }) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={
-        label
-      }
-      onPress={
-        onPress
-      }
-      style={({
-        pressed,
-      }) => [
-        styles.primaryAction,
-        pressed
-          ? styles.primaryActionPressed
-          : null,
-      ]}
-    >
-      <Text
-        style={
-          styles.primaryActionText
-        }
-      >
-        {label}
-      </Text>
-    </Pressable>
+    <AppButton
+      label={label}
+      icon="add-outline"
+      onPress={onPress}
+    />
   );
 }
 
@@ -346,31 +352,11 @@ function SecondaryAction({
   onPress: () => void;
 }) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={
-        label
-      }
-      onPress={
-        onPress
-      }
-      style={({
-        pressed,
-      }) => [
-        styles.secondaryAction,
-        pressed
-          ? styles.secondaryActionPressed
-          : null,
-      ]}
-    >
-      <Text
-        style={
-          styles.secondaryActionText
-        }
-      >
-        {label}
-      </Text>
-    </Pressable>
+    <AppButton
+      label={label}
+      variant="secondary"
+      onPress={onPress}
+    />
   );
 }
 
@@ -414,24 +400,25 @@ function AccountCard({
               /_/g,
               ' ',
             )}
-            {' Â· '}
+            {' · '}
             {account.currency_code}
           </Text>
         </View>
 
-        <View
-          style={
-            styles.statusPill
+        <StatusChip
+          label={
+            account.sync_status !== 'synced'
+              ? 'Pending sync'
+              : account.status
           }
-        >
-          <Text
-            style={
-              styles.statusPillText
-            }
-          >
-            {account.status}
-          </Text>
-        </View>
+          tone={
+            account.sync_status !== 'synced'
+              ? 'warning'
+              : account.status === 'active'
+                ? 'success'
+                : 'neutral'
+          }
+        />
       </View>
 
       <Text
@@ -470,7 +457,7 @@ function ActivityRow({
     isIncome
       ? '+'
       : isExpense
-        ? 'âˆ’'
+        ? '−'
         : '';
 
   return (
@@ -503,7 +490,7 @@ function ActivityRow({
         >
           {item.account_name}
           {item.category_name
-            ? ` Â· ${item.category_name}`
+            ? ` · ${item.category_name}`
             : ''}
         </Text>
 
@@ -545,23 +532,10 @@ function ActivityRow({
 
 function LoadingState() {
   return (
-    <View
-      style={
-        styles.loading
-      }
-    >
-      <ActivityIndicator
-        size="small"
-      />
-
-      <Text
-        style={
-          styles.loadingText
-        }
-      >
-        Loading saved financesâ€¦
-      </Text>
-    </View>
+    <StatePanel
+      loading
+      description="Loading saved finances..."
+    />
   );
 }
 
@@ -641,6 +615,26 @@ export function LocalHomeScreen() {
         }
       />
 
+      <SyncQueueBanner />
+
+      <DashboardCommandCenter />
+
+      <HomeBudgetCard />
+
+      <HomeSavingsGoalCard />
+
+      <HomeSixJarCard />
+
+      <HomeLoansCard />
+
+      <HomeRoscaCard />
+
+      <HomeGamificationCard />
+
+      <HomeAiCoachCard />
+
+      <HomeNotificationsCard />
+
       <View
         style={
           styles.actionRow
@@ -675,6 +669,20 @@ export function LocalHomeScreen() {
             }}
           />
         </View>
+      </View>
+
+      <View
+        style={{
+          marginTop: -18,
+          marginBottom: 28,
+        }}
+      >
+        <SecondaryAction
+          label="Transfer between accounts"
+          onPress={() => {
+            router.push('/transfer' as never);
+          }}
+        />
       </View>
 
       {isInitialLoading ? (
@@ -870,6 +878,8 @@ export function LocalAccountsScreen() {
         }
       />
 
+      <SyncQueueBanner />
+
       {isInitialLoading ? (
         <LoadingState />
       ) : accounts.length === 0 ? (
@@ -1001,6 +1011,8 @@ export function LocalActivityScreen() {
         }
       />
 
+      <SyncQueueBanner />
+
       {isInitialLoading ? (
         <LoadingState />
       ) : activity.length === 0 ? (
@@ -1057,39 +1069,58 @@ const styles =
 
     content: {
       flexGrow: 1,
-      paddingHorizontal: 20,
-      paddingTop: 18,
+      width: '100%',
+      maxWidth:
+        layout.contentMaxWidth,
+      alignSelf: 'center',
+      paddingHorizontal:
+        layout.screenHorizontalPadding,
+      paddingTop:
+        spacing.md,
       paddingBottom: 120,
     },
 
     hero: {
-      paddingTop: 8,
-      paddingBottom: 22,
+      paddingTop:
+        spacing.sm,
+      paddingBottom:
+        spacing.lg,
     },
 
     eyebrow: {
-      fontSize: 12,
-      fontWeight: '700',
-      letterSpacing: 1.4,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+      fontWeight:
+        typography.weightBold,
+      letterSpacing: 1.25,
       color:
         palette.primary,
-      marginBottom: 8,
+      marginBottom:
+        spacing.sm,
     },
 
     heroTitle: {
-      fontSize: 32,
-      lineHeight: 38,
-      fontWeight: '700',
+      fontSize:
+        typography.title,
+      lineHeight:
+        typography.lineHeightTitle,
+      fontWeight:
+        typography.weightExtraBold,
       color:
         palette.text,
       letterSpacing: -0.7,
     },
 
     heroBody: {
-      marginTop: 9,
-      maxWidth: 420,
-      fontSize: 15,
-      lineHeight: 22,
+      marginTop:
+        spacing.sm,
+      maxWidth: 440,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
       color:
         palette.textMuted,
     },
@@ -1099,27 +1130,36 @@ const styles =
       alignItems: 'center',
       justifyContent:
         'space-between',
-      gap: 16,
-      marginBottom: 20,
+      gap:
+        spacing.md,
+      marginBottom:
+        spacing.lg,
     },
 
     pageHeaderCopy: {
       flex: 1,
+      minWidth: 0,
     },
 
     pageTitle: {
-      fontSize: 28,
-      lineHeight: 34,
-      fontWeight: '700',
+      fontSize:
+        typography.heading,
+      lineHeight:
+        typography.lineHeightHeading,
+      fontWeight:
+        typography.weightExtraBold,
       color:
         palette.text,
-      letterSpacing: -0.5,
+      letterSpacing: -0.4,
     },
 
     pageSubtitle: {
-      marginTop: 5,
-      fontSize: 14,
-      lineHeight: 20,
+      marginTop:
+        spacing.xs,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
       color:
         palette.textMuted,
     },
@@ -1127,32 +1167,47 @@ const styles =
     offlineBanner: {
       backgroundColor:
         palette.warningBackground,
-      borderRadius: 14,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      marginBottom: 16,
+      borderRadius:
+        radii.md,
+      borderWidth: 1,
+      borderColor:
+        colors.warning,
+      paddingHorizontal:
+        spacing.md,
+      paddingVertical:
+        spacing.sm,
+      marginBottom:
+        spacing.md,
     },
 
     offlineTitle: {
-      fontSize: 13,
-      lineHeight: 18,
-      fontWeight: '700',
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+      fontWeight:
+        typography.weightBold,
       color:
         palette.warningText,
     },
 
     offlineBody: {
-      marginTop: 2,
-      fontSize: 12,
-      lineHeight: 17,
+      marginTop:
+        spacing.xxs,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
       color:
         palette.warningText,
     },
 
     actionRow: {
       flexDirection: 'row',
-      gap: 10,
-      marginBottom: 28,
+      gap:
+        spacing.sm,
+      marginBottom:
+        spacing.lg,
     },
 
     actionColumn: {
@@ -1160,13 +1215,8 @@ const styles =
     },
 
     primaryAction: {
-      minHeight: 50,
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderRadius: 14,
-      backgroundColor:
-        palette.primary,
-      paddingHorizontal: 16,
+      minHeight:
+        layout.touchTarget,
     },
 
     primaryActionPressed: {
@@ -1174,22 +1224,17 @@ const styles =
     },
 
     primaryActionText: {
-      fontSize: 15,
-      fontWeight: '700',
-      color: '#FFFFFF',
+      fontSize:
+        typography.body,
+      fontWeight:
+        typography.weightBold,
+      color:
+        colors.textOnPrimary,
     },
 
     secondaryAction: {
-      minHeight: 50,
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderRadius: 14,
-      backgroundColor:
-        palette.surface,
-      borderWidth: 1,
-      borderColor:
-        palette.border,
-      paddingHorizontal: 16,
+      minHeight:
+        layout.touchTarget,
     },
 
     secondaryActionPressed: {
@@ -1198,65 +1243,86 @@ const styles =
     },
 
     secondaryActionText: {
-      fontSize: 15,
-      fontWeight: '700',
+      fontSize:
+        typography.body,
+      fontWeight:
+        typography.weightBold,
       color:
         palette.text,
     },
 
     compactButton: {
-      minWidth: 66,
-      minHeight: 42,
-      paddingHorizontal: 15,
+      minWidth:
+        layout.touchTarget,
+      minHeight:
+        layout.touchTarget,
+      paddingHorizontal:
+        spacing.md,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 13,
+      borderRadius:
+        radii.md,
       backgroundColor:
         palette.primary,
     },
 
     compactButtonText: {
-      color: '#FFFFFF',
-      fontSize: 14,
-      fontWeight: '700',
+      color:
+        colors.textOnPrimary,
+      fontSize:
+        typography.small,
+      fontWeight:
+        typography.weightBold,
     },
 
     sectionHeading: {
-      marginBottom: 12,
+      marginBottom:
+        spacing.sm,
     },
 
     sectionTitle: {
-      fontSize: 19,
-      lineHeight: 24,
-      fontWeight: '700',
+      fontSize:
+        typography.subheading,
+      lineHeight:
+        typography.lineHeightSubheading,
+      fontWeight:
+        typography.weightBold,
       color:
         palette.text,
     },
 
     sectionSupporting: {
-      marginTop: 3,
-      fontSize: 13,
-      lineHeight: 18,
+      marginTop:
+        spacing.xxs,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
       color:
         palette.textMuted,
     },
 
     sectionSpacer: {
-      height: 28,
+      height:
+        spacing.xl,
     },
 
     stack: {
-      gap: 10,
+      gap:
+        spacing.sm,
     },
 
     accountCard: {
-      borderRadius: 18,
-      padding: 17,
+      borderRadius:
+        radii.lg,
+      padding:
+        spacing.md,
       backgroundColor:
         palette.surface,
       borderWidth: 1,
       borderColor:
         palette.border,
+      ...elevation.card,
     },
 
     accountTopRow: {
@@ -1264,25 +1330,33 @@ const styles =
       alignItems: 'flex-start',
       justifyContent:
         'space-between',
-      gap: 12,
+      gap:
+        spacing.md,
     },
 
     accountIdentity: {
       flex: 1,
+      minWidth: 0,
     },
 
     accountName: {
-      fontSize: 16,
-      lineHeight: 21,
-      fontWeight: '700',
+      fontSize:
+        typography.body,
+      lineHeight:
+        typography.lineHeightBody,
+      fontWeight:
+        typography.weightBold,
       color:
         palette.text,
     },
 
     accountMeta: {
-      marginTop: 3,
-      fontSize: 12,
-      lineHeight: 17,
+      marginTop:
+        spacing.xxs,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
       textTransform:
         'capitalize',
       color:
@@ -1290,49 +1364,64 @@ const styles =
     },
 
     statusPill: {
-      paddingHorizontal: 9,
-      paddingVertical: 5,
-      borderRadius: 999,
+      paddingHorizontal:
+        spacing.sm,
+      paddingVertical:
+        spacing.xs,
+      borderRadius:
+        radii.pill,
       backgroundColor:
         palette.surfaceMuted,
     },
 
     statusPillText: {
-      fontSize: 11,
-      lineHeight: 14,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
       textTransform:
         'capitalize',
-      fontWeight: '700',
+      fontWeight:
+        typography.weightBold,
       color:
         palette.primary,
     },
 
     accountBalance: {
-      marginTop: 19,
-      fontSize: 22,
-      lineHeight: 27,
-      fontWeight: '700',
+      marginTop:
+        spacing.lg,
+      fontSize:
+        typography.heading,
+      lineHeight:
+        typography.lineHeightHeading,
+      fontWeight:
+        typography.weightExtraBold,
       color:
         palette.text,
-      letterSpacing: -0.35,
+      letterSpacing: -0.4,
     },
 
     activityCard: {
       backgroundColor:
         palette.surface,
-      borderRadius: 18,
+      borderRadius:
+        radii.lg,
       borderWidth: 1,
       borderColor:
         palette.border,
-      paddingHorizontal: 16,
+      paddingHorizontal:
+        spacing.md,
+      ...elevation.card,
     },
 
     activityRow: {
-      minHeight: 88,
+      minHeight: 84,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 14,
-      paddingVertical: 14,
+      gap:
+        spacing.md,
+      paddingVertical:
+        spacing.md,
     },
 
     activityMain: {
@@ -1342,34 +1431,45 @@ const styles =
 
     activityTitle: {
       fontSize: 15,
-      lineHeight: 20,
-      fontWeight: '700',
+      lineHeight:
+        typography.lineHeightSmall,
+      fontWeight:
+        typography.weightSemibold,
       color:
         palette.text,
     },
 
     activityMeta: {
-      marginTop: 3,
-      fontSize: 12,
-      lineHeight: 17,
+      marginTop:
+        spacing.xxs,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
       color:
         palette.textMuted,
     },
 
     activityDate: {
-      marginTop: 3,
-      fontSize: 11,
-      lineHeight: 15,
+      marginTop:
+        spacing.xxs,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
       color:
-        palette.textMuted,
+        colors.textTertiary,
     },
 
     activityAmount: {
       maxWidth: '44%',
       textAlign: 'right',
-      fontSize: 14,
-      lineHeight: 19,
-      fontWeight: '700',
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+      fontWeight:
+        typography.weightBold,
       color:
         palette.text,
     },
@@ -1392,8 +1492,10 @@ const styles =
     },
 
     emptyCard: {
-      borderRadius: 18,
-      padding: 22,
+      borderRadius:
+        radii.lg,
+      padding:
+        spacing.lg,
       backgroundColor:
         palette.surface,
       borderWidth: 1,
@@ -1402,17 +1504,23 @@ const styles =
     },
 
     emptyTitle: {
-      fontSize: 16,
-      lineHeight: 21,
-      fontWeight: '700',
+      fontSize:
+        typography.body,
+      lineHeight:
+        typography.lineHeightBody,
+      fontWeight:
+        typography.weightBold,
       color:
         palette.text,
     },
 
     emptyBody: {
-      marginTop: 5,
-      fontSize: 14,
-      lineHeight: 20,
+      marginTop:
+        spacing.xs,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
       color:
         palette.textMuted,
     },
@@ -1421,11 +1529,13 @@ const styles =
       minHeight: 180,
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 10,
+      gap:
+        spacing.sm,
     },
 
     loadingText: {
-      fontSize: 13,
+      fontSize:
+        typography.small,
       color:
         palette.textMuted,
     },

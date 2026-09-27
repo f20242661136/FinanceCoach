@@ -1,0 +1,19 @@
+Savings Goals development script 01 completed.
+
+Scope:
+- savings_goals table
+- savings_contributions history table
+- RLS isolation
+- BIGINT minor-unit money
+- no mutable current_amount
+- idempotent create_savings_goal RPC
+- idempotent add_savings_contribution RPC
+- server-derived goal progress
+- contribution history RPC
+- TypeScript/Zod contracts
+- Supabase service adapters
+- React Query hooks
+- progress formatting helpers
+
+No tests were run.
+Run Savings Goals development script 02 before validation.

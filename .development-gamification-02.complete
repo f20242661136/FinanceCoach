@@ -1,0 +1,23 @@
+Gamification development script 02 completed.
+
+Scope:
+- calm progress screen
+- level + points presentation
+- centralized level-progress presentation
+- logging/saving/challenge streak cards
+- available challenge list
+- start challenge action
+- server-verified challenge progress refresh
+- earned badges
+- recent event-based points
+- explicit healthy-motivation messaging
+- no arbitrary client point-award action
+- device IANA timezone sent to server
+- Home Progress card
+- Expo Router route
+- UTF-8-safe Home integration
+
+No tests were run.
+
+Both Gamification development scripts are complete.
+Next step: interactive validation only.

@@ -1,0 +1,16 @@
+Budget development script 01 completed.
+Scope:
+- budgets + budget_categories migration
+- RLS
+- idempotent create_budget RPC
+- server-authoritative get_budget_status RPC
+- monthly/annual/custom periods
+- overall/category budgets
+- server-computed spent/remaining/usage/projection/over-budget
+- TypeScript/Zod contract
+- bound Supabase RPC adapter
+- React Query hooks
+- deterministic money display/input helpers
+
+No tests were run.
+Run budget development script 02 before validation.

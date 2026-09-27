@@ -1,0 +1,16 @@
+Finance Coach financial-integrity remediation step 3
+Created: 2026-09-26
+Migration: supabase\migrations\20260926162000_transfer_conservation_hardening.sql
+Test: supabase\tests\database\009_transfer_conservation_security.test.sql
+
+Confirmed blocker addressed:
+- create_transfer accepted PKR source amount 10000 and destination amount 9000
+- invalid transfer changed source balance and violated wealth conservation
+
+New database invariants:
+- source and destination accounts must differ
+- source amount must be positive
+- destination amount must be positive
+- current v1 transfers must be same currency
+- same-currency transfer amounts must be equal
+- migration refuses to silently rewrite pre-existing invalid financial history

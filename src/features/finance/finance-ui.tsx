@@ -23,28 +23,53 @@ import {
   formatMinorUnits,
 } from '@/domain/money/money';
 
+import {
+  AppCard,
+} from '@/components/ui/app-card';
+import {
+  AppSectionHeader,
+} from '@/components/ui/app-section-header';
+import {
+  StatePanel,
+} from '@/components/ui/state-panel';
+
+import {
+  colors,
+  elevation,
+  layout,
+  radii,
+  spacing,
+  typography,
+} from '@/design/tokens';
+
+/**
+ * Backward-compatible finance palette.
+ *
+ * Feature screens can keep importing financeColors while the underlying
+ * visual language now comes from the canonical design token contract.
+ */
 export const financeColors = {
-  background: '#F5F7F5',
-  surface: '#FFFFFF',
-  surfaceSoft: '#EEF5F1',
-  text: '#17211B',
-  textMuted: '#68746D',
-  border: '#DDE5E0',
-  primary: '#177653',
-  primaryPressed: '#105C40',
-  positive: '#177653',
-  negative: '#A33A2B',
-  warning: '#9A6700',
-  neutral: '#526159',
+  background: colors.background,
+  surface: colors.surface,
+  surfaceSoft: colors.surfaceMuted,
+  text: colors.text,
+  textMuted: colors.textSecondary,
+  border: colors.border,
+  primary: colors.primary,
+  primaryPressed: colors.primaryPressed,
+  positive: colors.success,
+  negative: colors.danger,
+  warning: colors.warning,
+  neutral: colors.neutral,
 } as const;
 
 export function FinanceCard({
   children,
 }: PropsWithChildren) {
   return (
-    <View style={styles.card}>
+    <AppCard>
       {children}
-    </View>
+    </AppCard>
   );
 }
 
@@ -56,13 +81,10 @@ export function SectionHeader({
   action?: ReactNode;
 }) {
   return (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>
-        {title}
-      </Text>
-
-      {action}
-    </View>
+    <AppSectionHeader
+      title={title}
+      action={action}
+    />
   );
 }
 
@@ -99,7 +121,7 @@ export function PrimaryButton({
     >
       {loading ? (
         <ActivityIndicator
-          color="#FFFFFF"
+          color={colors.textOnPrimary}
         />
       ) : (
         <>
@@ -107,7 +129,7 @@ export function PrimaryButton({
             <Ionicons
               name={icon}
               size={18}
-              color="#FFFFFF"
+              color={colors.textOnPrimary}
             />
           ) : null}
 
@@ -172,16 +194,10 @@ export function SecondaryButton({
 
 export function LoadingState() {
   return (
-    <View style={styles.state}>
-      <ActivityIndicator
-        size="small"
-        color={financeColors.primary}
-      />
-
-      <Text style={styles.stateText}>
-        Loading your financesÃ¢â‚¬Â¦
-      </Text>
-    </View>
+    <StatePanel
+      loading
+      description="Loading your finances..."
+    />
   );
 }
 
@@ -191,31 +207,20 @@ export function ErrorState({
   onRetry?: () => void;
 }) {
   return (
-    <FinanceCard>
-      <View style={styles.state}>
-        <Ionicons
-          name="cloud-offline-outline"
-          size={28}
-          color={financeColors.textMuted}
-        />
-
-        <Text style={styles.stateTitle}>
-          We could not load this yet
-        </Text>
-
-        <Text style={styles.stateText}>
-          Your saved financial data has
-          not been changed.
-        </Text>
-
-        {onRetry ? (
+    <StatePanel
+      title="We could not load this yet"
+      description="Your saved financial data has not been changed."
+      icon="cloud-offline-outline"
+      tone="danger"
+      action={
+        onRetry ? (
           <SecondaryButton
             title="Try again"
             onPress={onRetry}
           />
-        ) : null}
-      </View>
-    </FinanceCard>
+        ) : undefined
+      }
+    />
   );
 }
 
@@ -229,25 +234,13 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <FinanceCard>
-      <View style={styles.state}>
-        <Ionicons
-          name="wallet-outline"
-          size={30}
-          color={financeColors.primary}
-        />
-
-        <Text style={styles.stateTitle}>
-          {title}
-        </Text>
-
-        <Text style={styles.stateText}>
-          {description}
-        </Text>
-
-        {action}
-      </View>
-    </FinanceCard>
+    <StatePanel
+      title={title}
+      description={description}
+      icon="wallet-outline"
+      tone="info"
+      action={action}
+    />
   );
 }
 
@@ -289,7 +282,7 @@ export function ActivityRow({
     isIncome
       ? '+'
       : isExpense
-        ? 'Ã¢Ë†â€™'
+        ? '−'
         : '';
 
   const title =
@@ -346,7 +339,7 @@ export function ActivityRow({
           style={styles.activitySubtitle}
         >
           {activity.account_name}
-          {' Ã‚Â· '}
+          {' · '}
           {activity.transaction_date}
         </Text>
       </View>
@@ -379,8 +372,9 @@ const styles = StyleSheet.create({
       financeColors.border,
 
     borderWidth: 1,
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: radii.lg,
+    padding: layout.cardPadding,
+    ...elevation.card,
   },
 
   sectionHeader: {
@@ -388,26 +382,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent:
       'space-between',
-    gap: 12,
+    gap: spacing.sm,
   },
 
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: typography.subheading,
+    lineHeight: typography.lineHeightSubheading,
+    fontWeight: typography.weightBold,
     color: financeColors.text,
   },
 
   primaryButton: {
-    minHeight: 50,
-    borderRadius: 16,
+    minHeight: layout.touchTarget + 2,
+    borderRadius: radii.md,
     backgroundColor:
       financeColors.primary,
 
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 18,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
   },
 
   primaryButtonPressed: {
@@ -416,26 +411,26 @@ const styles = StyleSheet.create({
   },
 
   primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
+    color: colors.textOnPrimary,
+    fontSize: typography.body,
+    fontWeight: typography.weightBold,
   },
 
   secondaryButton: {
-    minHeight: 44,
-    borderRadius: 14,
-    paddingHorizontal: 14,
+    minHeight: layout.touchTarget,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
+    gap: spacing.xs,
     backgroundColor:
       financeColors.surfaceSoft,
   },
 
   secondaryButtonText: {
     color: financeColors.primary,
-    fontWeight: '700',
+    fontWeight: typography.weightBold,
   },
 
   buttonDisabled: {
@@ -444,14 +439,15 @@ const styles = StyleSheet.create({
 
   state: {
     alignItems: 'center',
-    paddingVertical: 18,
-    gap: 10,
+    paddingVertical: spacing.lg,
+    gap: spacing.sm,
   },
 
   stateTitle: {
     color: financeColors.text,
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: typography.subheading,
+    lineHeight: typography.lineHeightSubheading,
+    fontWeight: typography.weightBold,
     textAlign: 'center',
   },
 
@@ -459,8 +455,8 @@ const styles = StyleSheet.create({
     color:
       financeColors.textMuted,
 
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: typography.small,
+    lineHeight: typography.lineHeightSmall,
     textAlign: 'center',
   },
 
@@ -468,8 +464,8 @@ const styles = StyleSheet.create({
     minHeight: 64,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 11,
-    paddingVertical: 10,
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
   },
 
   activityIcon: {
@@ -483,11 +479,11 @@ const styles = StyleSheet.create({
   },
 
   incomeIcon: {
-    backgroundColor: '#E7F4ED',
+    backgroundColor: colors.successSurface,
   },
 
   expenseIcon: {
-    backgroundColor: '#F9ECE8',
+    backgroundColor: colors.dangerSurface,
   },
 
   activityMain: {
@@ -497,19 +493,20 @@ const styles = StyleSheet.create({
 
   activityTitle: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: typography.weightSemibold,
     color: financeColors.text,
   },
 
   activitySubtitle: {
-    fontSize: 12,
-    marginTop: 3,
+    fontSize: typography.caption,
+    lineHeight: typography.lineHeightCaption,
+    marginTop: spacing.xxs,
     color:
       financeColors.textMuted,
   },
 
   activityAmount: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: typography.weightBold,
   },
 });

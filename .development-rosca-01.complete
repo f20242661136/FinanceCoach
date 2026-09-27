@@ -1,0 +1,30 @@
+ROSCA development script 01 completed.
+
+Scope:
+- rosca_groups
+- rosca_members
+- rosca_cycles
+- rosca_contributions
+- rosca_payouts
+- join-code based invite/join flow
+- member order = payout order
+- weekly/monthly cycle scheduling
+- end-of-month safe monthly dates
+- forming -> active transition only when all member slots are filled
+- materialized planned contribution obligations
+- materialized planned payouts
+- explicit planned vs paid contribution state
+- explicit planned vs paid payout state
+- member or owner may record contribution paid
+- only owner may record payout paid
+- no automatic normal-ledger mutation
+- RLS read isolation
+- security-definer mutation validation
+- group list RPC
+- detailed group/member/cycle/contribution/payout RPC
+- TypeScript/Zod contracts
+- Supabase service layer
+- TanStack Query hooks
+
+No tests were run.
+Run ROSCA development script 02 before validation.

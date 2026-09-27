@@ -1,0 +1,18 @@
+Savings Goals development script 02 completed.
+
+Scope:
+- goals list screen
+- create goal flow
+- goal detail screen
+- contribution history
+- add contribution flow
+- server-derived progress presentation
+- currency minor-unit aware display/input
+- Home savings goal card
+- Expo Router routes
+- UTF-8-safe Home integration
+
+No tests were run by this script.
+
+Both Savings Goals development scripts are now complete.
+The next step is the scheduled validation cycle.

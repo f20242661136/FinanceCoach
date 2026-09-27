@@ -1,0 +1,51 @@
+Notifications development script 02 completed.
+
+Native/client:
+- expo-notifications installed with Expo SDK resolver
+- expo-device / expo-constants / expo-secure-store ensured
+- expo-notifications config plugin
+- Android Finance Coach reminder channel
+- runtime notification handler
+- Expo projectId-based push registration
+- physical-device guard
+- secure stable device UUID
+- best-effort registration refresh at app startup
+- explicit enable/disable push controls
+- notification response listener
+- cold-start notification response handling
+- opened-event acknowledgement
+- safe internal deep-link routing
+
+Server delivery:
+- notification-dispatch Edge Function
+- server-only custom dispatch secret
+- service-role scheduling refresh
+- FOR UPDATE SKIP LOCKED claim helper
+- Expo Push Service delivery
+- ticket persistence
+- receipt checking after 15 minutes
+- DeviceNotRegistered token deactivation
+- retry/failure handling
+- no financial values added to push copy
+
+UI:
+- notification settings
+- master/push/in-app toggles
+- quiet hours
+- reminder times
+- category preferences
+- budget warning threshold
+- notification center
+- Home Reminders card
+- routes
+- authenticated runtime integration
+
+Deployment:
+- Supabase Cron + Vault deployment guide
+- no hosted secret committed to Git
+
+No tests were run.
+
+Both Notifications development scripts are complete.
+Because expo-notifications adds native configuration, rebuild the Android development client before native push validation.
+Next step: interactive validation only.

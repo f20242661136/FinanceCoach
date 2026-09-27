@@ -1,0 +1,13 @@
+Finance Coach security audit remediation step 1
+Created: 2026-09-26
+Migration: supabase\migrations\20260926140500_security_function_acl_hardening.sql
+Test: supabase\tests\database\007_function_acl_security.test.sql
+
+Scope:
+- remove anonymous execution of public application functions
+- block authenticated execution of privileged internal helpers
+- block client execution of private-schema helpers
+- harden future postgres default ACLs for functions/tables/sequences
+- add pgTAP regression coverage
+
+Existing planning-domain table mutation ACLs are intentionally handled in the next security remediation step.

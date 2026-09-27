@@ -1,0 +1,38 @@
+AI Coach development script 02 completed.
+
+Provider:
+- Groq API
+- default model: openai/gpt-oss-20b
+- model configurable server-side through GROQ_MODEL
+
+Security/trust:
+- GROQ_API_KEY exists only in Edge Function secrets
+- real supabase/functions/.env is gitignored
+- authenticated Supabase user required
+- trusted financial context fetched under user identity/RLS
+- service/secret key remains only in Edge Function runtime
+- Groq receives summarized context rather than raw financial tables
+- deterministic BigInt minor-unit-to-decimal formatting occurs before model invocation
+- currencies remain separate
+- strict JSON-schema structured responses
+- no financial mutation tools exposed to the model
+- idempotent client message IDs for retry safety
+- basic per-user chat request-rate protection
+- generated insight reuse window prevents refresh spam
+
+UI:
+- AI Coach landing screen
+- generated insight section
+- conversation list
+- new conversation flow
+- chat screen
+- Fact / Observation / Suggestion / Education / Caution rendering
+- data-limitations rendering
+- loading and error states
+- Home AI Coach card
+- Expo Router routes
+
+No tests were run.
+
+Both AI Coach development scripts are complete.
+Next step: configure GROQ_API_KEY locally and run interactive validation.

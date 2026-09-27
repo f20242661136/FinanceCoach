@@ -48,3 +48,6 @@ example
 .env.development.local
 .env.staging.local
 .env.production.local
+
+# Local Edge Function secrets
+supabase/functions/.env

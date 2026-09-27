@@ -1,0 +1,14 @@
+Finance Coach security audit remediation step 2
+Created: 2026-09-26
+Migration: supabase\migrations\20260926142500_domain_mutation_boundary_hardening.sql
+Test: supabase\tests\database\008_domain_mutation_boundary_security.test.sql
+
+Scope:
+- make approved Budget/Savings/Loan/Six-Jar mutation RPCs SECURITY DEFINER
+  only after verifying they derive caller identity from auth.uid()
+- remove direct authenticated DML from those planning tables
+- remove direct authenticated DML from ROSCA/Gamification/AI/Notification
+  server-managed tables
+- preserve legitimate SELECT access
+- keep notification_devices RPC-only
+- add pgTAP mutation-boundary regression coverage
