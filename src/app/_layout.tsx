@@ -1,4 +1,7 @@
+import { StatusBar } from 'expo-status-bar';
 import { Stack } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StyleSheet } from 'react-native';
 
 import {
   colors,
@@ -87,10 +90,35 @@ function RootNavigator() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <SubscriptionProvider>
-        <RootNavigator />
-      </SubscriptionProvider>
-    </AuthProvider>
+    <>
+      <StatusBar
+        style="dark"
+        animated
+      />
+
+      <SafeAreaView
+        edges={[
+          'top',
+        ]}
+        style={
+          styles.rootSystemSafeArea
+        }
+      >
+        <AuthProvider>
+          <SubscriptionProvider>
+            <RootNavigator />
+          </SubscriptionProvider>
+        </AuthProvider>
+      </SafeAreaView>
+    </>
   );
 }
+
+const styles =
+  StyleSheet.create({
+    rootSystemSafeArea: {
+      flex: 1,
+      backgroundColor:
+        colors.background,
+    },
+  });

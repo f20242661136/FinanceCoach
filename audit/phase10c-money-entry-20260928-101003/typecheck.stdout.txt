@@ -1,0 +1,1 @@
+src/features/finance/offline-add-account-screen.tsx(281,17): error TS2322: Type '"warning"' is not assignable to type 'NoticeTone | undefined'.

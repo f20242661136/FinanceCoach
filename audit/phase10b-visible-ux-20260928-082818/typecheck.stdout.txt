@@ -1,0 +1,4 @@
+src/features/profile/settings-screen.tsx(295,19): error TS1005: ',' expected.
+src/features/profile/settings-screen.tsx(295,22): error TS1005: ',' expected.
+src/features/profile/settings-screen.tsx(309,19): error TS1005: ',' expected.
+src/features/profile/settings-screen.tsx(309,22): error TS1005: ',' expected.

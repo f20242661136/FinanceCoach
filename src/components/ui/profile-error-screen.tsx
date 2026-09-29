@@ -30,7 +30,14 @@ export function ProfileErrorScreen({
   onSignOut,
 }: ProfileErrorScreenProps) {
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView
+      edges={[
+        'left',
+        'right',
+        'bottom',
+      ]}
+      style={styles.safeArea}
+    >
       <View style={styles.content}>
         <BrandMark />
 

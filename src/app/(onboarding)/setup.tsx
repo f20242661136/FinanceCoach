@@ -1,35 +1,70 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+
 import {
+  useCallback,
   useEffect,
+  useMemo,
   useState,
 } from 'react';
+
 import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
   StyleSheet,
   Text,
-  View
+  View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/app-button';
-import { BrandMark } from '@/components/ui/brand-mark';
-import { InlineNotice } from '@/components/ui/inline-notice';
+import {
+  AppButton,
+} from '@/components/ui/app-button';
+
+import {
+  AppCard,
+} from '@/components/ui/app-card';
+
+import {
+  AppScreen,
+} from '@/components/ui/app-screen';
+
+import {
+  AppScreenHeader,
+} from '@/components/ui/app-screen-header';
+
+import {
+  BrandMark,
+} from '@/components/ui/brand-mark';
+
+import {
+  ChoiceChip,
+} from '@/components/ui/choice-chip';
+
+import {
+  InlineNotice,
+} from '@/components/ui/inline-notice';
+
 import {
   colors,
-  layout,
   radii,
   spacing,
   typography,
 } from '@/design/tokens';
-import { useAuth } from '@/features/auth/auth-context';
+
+import {
+  useAuth,
+} from '@/features/auth/auth-context';
+
 import {
   completeOnboarding,
   listActiveCurrencies,
   type CurrencyOption,
 } from '@/features/profile/profile-service';
-import { copy } from '@/i18n/copy';
+
+import {
+  copy,
+} from '@/i18n/copy';
+
+import {
+  toUserFacingError,
+} from '@/lib/user-facing-error';
 
 type CurrencyLoadState =
   | 'loading'
@@ -59,8 +94,10 @@ export default function SetupScreen() {
     refreshProfile,
   } = useAuth();
 
-  const [currencies, setCurrencies] =
-    useState<CurrencyOption[]>([]);
+  const [
+    currencies,
+    setCurrencies,
+  ] = useState<CurrencyOption[]>([]);
 
   const [
     currencyLoadState,
@@ -69,112 +106,184 @@ export default function SetupScreen() {
     'loading',
   );
 
-  const [selectedCurrency, setSelectedCurrency] =
-    useState<string | null>(
-      profile?.base_currency_code ?? null,
-    );
+  const [
+    selectedCurrency,
+    setSelectedCurrency,
+  ] = useState<string | null>(
+    profile?.base_currency_code
+      ?? null,
+  );
 
-  const [submitError, setSubmitError] =
-    useState<string | null>(null);
+  const [
+    submitError,
+    setSubmitError,
+  ] = useState<string | null>(
+    null,
+  );
 
-  const [isSubmitting, setIsSubmitting] =
-    useState(false);
+  const [
+    isSubmitting,
+    setIsSubmitting,
+  ] = useState(false);
 
-  const locale = detectLocale();
-  const timezone = detectTimezone();
+  const locale =
+    detectLocale();
 
-  useEffect(() => {
-    let cancelled = false;
-
-    void listActiveCurrencies()
-      .then((data) => {
-        if (!cancelled) {
-          setCurrencies(data);
-          setCurrencyLoadState('ready');
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setCurrencyLoadState('error');
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const submit = async () => {
-    if (
-      !session ||
-      !selectedCurrency
-    ) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    setSubmitError(null);
-
-    try {
-      await completeOnboarding(
-        session.user.id,
-        {
-          baseCurrencyCode:
-            selectedCurrency,
-          locale,
-          timezone,
-        },
-      );
-
-      await refreshProfile();
-    } catch (error) {
-      setSubmitError(
-        error instanceof Error
-          ? error.message
-          : copy.auth.errors.generic,
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const timezone =
+    detectTimezone();
 
   const firstName =
     profile?.display_name
       ?.trim()
       .split(/\s+/)[0];
 
+  const selectedCurrencyOption =
+    useMemo(
+      () =>
+        currencies.find(
+          item =>
+            item.code
+            === selectedCurrency,
+        )
+        ?? null,
+      [
+        currencies,
+        selectedCurrency,
+      ],
+    );
+
+  const loadCurrencies =
+    useCallback(async () => {
+      setCurrencyLoadState(
+        'loading',
+      );
+
+      try {
+        const data =
+          await listActiveCurrencies();
+
+        setCurrencies(data);
+        setCurrencyLoadState(
+          'ready',
+        );
+
+        setSelectedCurrency(
+          current => {
+            if (
+              current
+              && data.some(
+                item =>
+                  item.code === current,
+              )
+            ) {
+              return current;
+            }
+
+            const profileCurrency =
+              profile
+                ?.base_currency_code;
+
+            if (
+              profileCurrency
+              && data.some(
+                item =>
+                  item.code
+                  === profileCurrency,
+              )
+            ) {
+              return profileCurrency;
+            }
+
+            return null;
+          },
+        );
+      } catch {
+        setCurrencyLoadState(
+          'error',
+        );
+      }
+    }, [
+      profile
+        ?.base_currency_code,
+    ]);
+
+  useEffect(() => {
+    const timer =
+      setTimeout(() => {
+        void loadCurrencies();
+      }, 0);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [loadCurrencies]);
+
+  const submit =
+    async () => {
+      if (
+        !session
+        || !selectedCurrency
+      ) {
+        return;
+      }
+
+      setIsSubmitting(true);
+      setSubmitError(null);
+
+      try {
+        await completeOnboarding(
+          session.user.id,
+          {
+            baseCurrencyCode:
+              selectedCurrency,
+            locale,
+            timezone,
+          },
+        );
+
+        await refreshProfile();
+      } catch (error) {
+        setSubmitError(
+          toUserFacingError(
+            error,
+            'onboarding',
+          ),
+        );
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          paddingBottom: 32,
-        }}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        showsVerticalScrollIndicator={false}
-      >
-      <View style={styles.outer}>
-        <BrandMark />
+    <AppScreen
+      keyboardAware
+      header={<BrandMark />}
+    >
+      <AppScreenHeader
+        eyebrow="Step 1 of 1"
+        title={
+          firstName
+            ? `${firstName}, ${copy.onboarding.title.toLowerCase()}`
+            : copy.onboarding.title
+        }
+        subtitle={
+          copy.onboarding.subtitle
+        }
+      />
 
-        <View style={styles.heading}>
-          <Text style={styles.eyebrow}>
-            {copy.onboarding.eyebrow}
-          </Text>
+      <AppCard style={styles.card}>
+        <View style={styles.sectionTitleRow}>
+          <View style={styles.sectionIcon}>
+            <Ionicons
+              name="cash-outline"
+              size={20}
+              color={
+                colors.primary
+              }
+            />
+          </View>
 
-          <Text style={styles.title}>
-            {firstName
-              ? `${firstName}, ${copy.onboarding.title.toLowerCase()}`
-              : copy.onboarding.title}
-          </Text>
-
-          <Text style={styles.subtitle}>
-            {copy.onboarding.subtitle}
-          </Text>
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.sectionHeading}>
+          <View style={styles.sectionCopy}>
             <Text style={styles.sectionTitle}>
               {
                 copy.onboarding
@@ -189,338 +298,368 @@ export default function SetupScreen() {
               }
             </Text>
           </View>
+        </View>
 
-          {currencyLoadState ===
-          'loading' ? (
-            <View style={styles.loadingRow}>
-              <ActivityIndicator
-                size="small"
-                color={colors.primary}
-              />
-              <Text style={styles.muted}>
-                {
-                  copy.onboarding
-                    .loadingCurrencies
-                }
-              </Text>
-            </View>
-          ) : null}
+        {currencyLoadState
+        === 'loading' ? (
+          <View style={styles.loadingCard}>
+            <Text style={styles.loadingTitle}>
+              {
+                copy.onboarding
+                  .loadingCurrencies
+              }
+            </Text>
 
-          {currencyLoadState ===
-          'error' ? (
+            <Text style={styles.loadingBody}>
+              This should only take a moment.
+            </Text>
+          </View>
+        ) : null}
+
+        {currencyLoadState
+        === 'error' ? (
+          <View style={styles.stack}>
             <InlineNotice
               message={
-                copy.onboarding.noCurrencies
+                copy.onboarding
+                  .noCurrencies
               }
               tone="error"
             />
-          ) : null}
 
-          {currencyLoadState ===
-          'ready' ? (
-            <View
-              style={styles.currencyGrid}
-            >
+            <AppButton
+              label="Try again"
+              variant="secondary"
+              icon="refresh-outline"
+              onPress={() => {
+                void loadCurrencies();
+              }}
+            />
+          </View>
+        ) : null}
+
+        {currencyLoadState
+        === 'ready' ? (
+          <>
+            <View style={styles.currencyGrid}>
               {currencies.map(
-                (currency) => {
-                  const selected =
-                    selectedCurrency ===
-                    currency.code;
-
-                  return (
-                    <Pressable
-                      key={currency.code}
-                      accessibilityRole="radio"
-                      accessibilityState={{
-                        selected,
-                      }}
-                      onPress={() =>
-                        setSelectedCurrency(
-                          currency.code,
-                        )
-                      }
-                      style={({ pressed }) => [
-                        styles.currencyOption,
-                        selected &&
-                          styles.currencySelected,
-                        pressed &&
-                          styles.currencyPressed,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.currencyCode,
-                          selected &&
-                            styles.currencySelectedText,
-                        ]}
-                      >
-                        {currency.code}
-                      </Text>
-
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          styles.currencyName,
-                          selected &&
-                            styles.currencySelectedText,
-                        ]}
-                      >
-                        {currency.name}
-                      </Text>
-
-                      <Text
-                        style={[
-                          styles.currencySymbol,
-                          selected &&
-                            styles.currencySelectedText,
-                        ]}
-                      >
-                        {currency.symbol}
-                      </Text>
-                    </Pressable>
-                  );
-                },
+                currency => (
+                  <ChoiceChip
+                    key={
+                      currency.code
+                    }
+                    role="radio"
+                    label={
+                      `${currency.code} ${currency.symbol}`
+                    }
+                    accessibilityLabel={
+                      `${currency.name}, ${currency.code}, ${currency.symbol}`
+                    }
+                    selected={
+                      selectedCurrency
+                      === currency.code
+                    }
+                    onPress={() => {
+                      setSelectedCurrency(
+                        currency.code,
+                      );
+                    }}
+                  />
+                ),
               )}
             </View>
-          ) : null}
 
-          <View style={styles.preferenceCard}>
-            <View style={styles.preferenceHeader}>
-              <Ionicons
-                name="globe-outline"
-                size={20}
-                color={colors.primary}
+            {selectedCurrencyOption ? (
+              <View style={styles.selectionSummary}>
+                <Text style={styles.selectionLabel}>
+                  Selected currency
+                </Text>
+
+                <Text style={styles.selectionValue}>
+                  {
+                    selectedCurrencyOption
+                      .name
+                  }
+                  {' - '}
+                  {
+                    selectedCurrencyOption
+                      .code
+                  }
+                </Text>
+              </View>
+            ) : (
+              <InlineNotice
+                message="Choose the currency you use most often. You can still track accounts in other supported currencies."
+                tone="info"
               />
+            )}
+          </>
+        ) : null}
+      </AppCard>
 
-              <Text
-                style={styles.preferenceTitle}
-              >
-                {
-                  copy.onboarding
-                    .detectedPreferences
-                }
-              </Text>
-            </View>
-
-            <View style={styles.preferenceRow}>
-              <Text style={styles.preferenceLabel}>
-                {copy.onboarding.locale}
-              </Text>
-
-              <Text style={styles.preferenceValue}>
-                {locale}
-              </Text>
-            </View>
-
-            <View style={styles.preferenceRow}>
-              <Text style={styles.preferenceLabel}>
-                {copy.onboarding.timezone}
-              </Text>
-
-              <Text style={styles.preferenceValue}>
-                {timezone}
-              </Text>
-            </View>
-          </View>
-
-          {submitError ? (
-            <InlineNotice
-              message={submitError}
-              tone="error"
-            />
-          ) : null}
-
-          <AppButton
-            label={copy.onboarding.continue}
-            loading={isSubmitting}
-            disabled={
-              !selectedCurrency ||
-              currencyLoadState !== 'ready'
+      <AppCard
+        tone="muted"
+        style={styles.card}
+      >
+        <View style={styles.preferenceHeader}>
+          <Ionicons
+            name="globe-outline"
+            size={20}
+            color={
+              colors.primary
             }
-            onPress={() => {
-              void submit();
-            }}
           />
 
-          <Text style={styles.privacy}>
-            {copy.onboarding.privacy}
+          <View style={styles.sectionCopy}>
+            <Text style={styles.preferenceTitle}>
+              {
+                copy.onboarding
+                  .detectedPreferences
+              }
+            </Text>
+
+            <Text style={styles.sectionBody}>
+              Finance Coach uses these values for dates, reminders, and formatting.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.preferenceRow}>
+          <Text style={styles.preferenceLabel}>
+            {copy.onboarding.locale}
+          </Text>
+
+          <Text style={styles.preferenceValue}>
+            {locale}
           </Text>
         </View>
-      </View>
-      </ScrollView>
-    </SafeAreaView>
+
+        <View style={styles.preferenceRow}>
+          <Text style={styles.preferenceLabel}>
+            {copy.onboarding.timezone}
+          </Text>
+
+          <Text
+            numberOfLines={2}
+            style={styles.preferenceValue}
+          >
+            {timezone}
+          </Text>
+        </View>
+      </AppCard>
+
+      {submitError ? (
+        <InlineNotice
+          message={submitError}
+          tone="error"
+        />
+      ) : null}
+
+      <AppButton
+        label={copy.onboarding.continue}
+        loading={isSubmitting}
+        disabled={
+          !selectedCurrency
+          || currencyLoadState
+            !== 'ready'
+        }
+        onPress={() => {
+          void submit();
+        }}
+      />
+
+      <Text style={styles.privacy}>
+        {copy.onboarding.privacy}
+      </Text>
+    </AppScreen>
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+const styles =
+  StyleSheet.create({
+    card: {
+      gap:
+        spacing.lg,
+    },
 
-  outer: {
-    flex: 1,
-    width: '100%',
-    maxWidth: layout.contentMaxWidth,
-    alignSelf: 'center',
-    padding: spacing.lg,
-    gap: spacing.xl,
-  },
+    stack: {
+      gap:
+        spacing.md,
+    },
 
-  heading: {
-    gap: spacing.sm,
-  },
+    sectionTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap:
+        spacing.md,
+    },
 
-  eyebrow: {
-    color: colors.success,
-    fontSize: typography.small,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
+    sectionIcon: {
+      width: 40,
+      height: 40,
+      borderRadius:
+        radii.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor:
+        colors.primarySoft,
+    },
 
-  title: {
-    color: colors.text,
-    fontSize: typography.title,
-    lineHeight: 40,
-    fontWeight: '800',
-    letterSpacing: -0.8,
-  },
+    sectionCopy: {
+      flex: 1,
+      minWidth: 0,
+      gap:
+        spacing.xs,
+    },
 
-  subtitle: {
-    color: colors.textSecondary,
-    fontSize: typography.body,
-    lineHeight: 24,
-  },
+    sectionTitle: {
+      color:
+        colors.text,
+      fontSize:
+        typography.subheading,
+      lineHeight:
+        typography.lineHeightSubheading,
+      fontWeight:
+        typography.weightExtraBold,
+    },
 
-  card: {
-    gap: spacing.lg,
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
+    sectionBody: {
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+    },
 
-  sectionHeading: {
-    gap: spacing.xs,
-  },
+    loadingCard: {
+      gap:
+        spacing.xs,
+      padding:
+        spacing.md,
+      borderRadius:
+        radii.md,
+      backgroundColor:
+        colors.surfaceMuted,
+    },
 
-  sectionTitle: {
-    color: colors.text,
-    fontSize: typography.subheading,
-    fontWeight: '800',
-  },
+    loadingTitle: {
+      color:
+        colors.text,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+      fontWeight:
+        typography.weightBold,
+    },
 
-  sectionBody: {
-    color: colors.textSecondary,
-    fontSize: typography.small,
-    lineHeight: 20,
-  },
+    loadingBody: {
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+    },
 
-  loadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
+    currencyGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap:
+        spacing.sm,
+    },
 
-  muted: {
-    color: colors.textSecondary,
-    fontSize: typography.small,
-  },
+    selectionSummary: {
+      gap:
+        spacing.xs,
+      padding:
+        spacing.md,
+      borderRadius:
+        radii.md,
+      borderWidth: 1,
+      borderColor:
+        colors.accentStrong,
+      backgroundColor:
+        colors.primarySoft,
+    },
 
-  currencyGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
+    selectionLabel: {
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+    },
 
-  currencyOption: {
-    minWidth: '30%',
-    flexGrow: 1,
-    flexBasis: 140,
-    gap: 2,
-    padding: spacing.md,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
+    selectionValue: {
+      color:
+        colors.primary,
+      fontSize:
+        typography.body,
+      lineHeight:
+        typography.lineHeightBody,
+      fontWeight:
+        typography.weightBold,
+    },
 
-  currencySelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.accent,
-  },
+    preferenceHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap:
+        spacing.sm,
+    },
 
-  currencyPressed: {
-    opacity: 0.78,
-  },
+    preferenceTitle: {
+      color:
+        colors.text,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+      fontWeight:
+        typography.weightBold,
+    },
 
-  currencyCode: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: '800',
-  },
+    preferenceRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent:
+        'space-between',
+      gap:
+        spacing.md,
+    },
 
-  currencyName: {
-    color: colors.textSecondary,
-    fontSize: typography.caption,
-  },
+    preferenceLabel: {
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+    },
 
-  currencySymbol: {
-    marginTop: spacing.xs,
-    color: colors.textSecondary,
-    fontSize: typography.small,
-    fontWeight: '700',
-  },
+    preferenceValue: {
+      flex: 1,
+      color:
+        colors.text,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+      fontWeight:
+        typography.weightBold,
+      textAlign: 'right',
+    },
 
-  currencySelectedText: {
-    color: colors.primary,
-  },
-
-  preferenceCard: {
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radii.md,
-    backgroundColor: colors.surfaceMuted,
-  },
-
-  preferenceHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-
-  preferenceTitle: {
-    color: colors.text,
-    fontSize: typography.small,
-    fontWeight: '800',
-  },
-
-  preferenceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-
-  preferenceLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.small,
-  },
-
-  preferenceValue: {
-    flex: 1,
-    color: colors.text,
-    fontSize: typography.small,
-    fontWeight: '700',
-    textAlign: 'right',
-  },
-
-  privacy: {
-    color: colors.textTertiary,
-    fontSize: typography.caption,
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-});
+    privacy: {
+      color:
+        colors.textTertiary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+      textAlign: 'center',
+    },
+  });

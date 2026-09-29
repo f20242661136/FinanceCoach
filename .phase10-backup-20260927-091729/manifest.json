@@ -1,0 +1,58 @@
+﻿[
+    {
+        "path":  ".env.example",
+        "existed":  true
+    },
+    {
+        "path":  "src/app/(app)/(finance)/subscription.tsx",
+        "existed":  true
+    },
+    {
+        "path":  "src/features/finance/local-first-screens.tsx",
+        "existed":  true
+    },
+    {
+        "path":  "src/features/gamification/gamification-screen.tsx",
+        "existed":  true
+    },
+    {
+        "path":  "src/features/subscriptions/SUBSCRIPTION_ARCHITECTURE.md",
+        "existed":  true
+    },
+    {
+        "path":  "src/features/subscriptions/home-subscription-card.tsx",
+        "existed":  true
+    },
+    {
+        "path":  "src/features/subscriptions/subscription-screen.tsx",
+        "existed":  true
+    },
+    {
+        "path":  "src/features/subscriptions/subscription-server-service.ts",
+        "existed":  true
+    },
+    {
+        "path":  "src/features/subscriptions/subscription-service.ts",
+        "existed":  true
+    },
+    {
+        "path":  "src/features/subscriptions/subscription-status.ts",
+        "existed":  true
+    },
+    {
+        "path":  "supabase/functions/.env.example",
+        "existed":  true
+    },
+    {
+        "path":  "supabase/functions/revenuecat-webhook/index.ts",
+        "existed":  true
+    },
+    {
+        "path":  "supabase/migrations/20260927090000_phase10_subscription_gating.sql",
+        "existed":  true
+    },
+    {
+        "path":  "supabase/tests/database/014_subscription_premium_gating.test.sql",
+        "existed":  true
+    }
+]

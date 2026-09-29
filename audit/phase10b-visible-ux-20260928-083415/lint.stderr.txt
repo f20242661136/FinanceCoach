@@ -1,0 +1,4 @@
+npm notice run finance-coach@1.0.0 lint
+npm notice run expo lint
+npm notice run finance-coach@1.0.0 npx
+npm notice run eslint D:\finance-coach\src --fix=false --cache=true --cache-location=D:\finance-coach\.expo\cache\eslint\

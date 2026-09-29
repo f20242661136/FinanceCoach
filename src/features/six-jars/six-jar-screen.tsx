@@ -1,3 +1,5 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+
 import {
   useEffect,
   useMemo,
@@ -14,16 +16,33 @@ import {
 } from 'react-native';
 
 import {
+  useRouter,
+} from 'expo-router';
+
+import {
+  AppButton,
+} from '@/components/ui/app-button';
+
+import {
+  InlineNotice,
+} from '@/components/ui/inline-notice';
+
+import {
+  StatePanel,
+} from '@/components/ui/state-panel';
+
+import {
   colors,
   elevation,
   layout,
   radii,
+  spacing,
   typography,
 } from '@/design/tokens';
 
 import {
-  useRouter,
-} from 'expo-router';
+  toUserFacingError,
+} from '@/lib/user-facing-error';
 
 import {
   useLocalFinanceReferenceData,
@@ -43,6 +62,26 @@ import {
   useSixJarProfile,
 } from './six-jar-query';
 
+function sixJarErrorMessage(
+  error: unknown,
+): string {
+  if (
+    error instanceof Error
+    && (
+      error.message
+        === 'Set up your Six-Jar profile first.'
+      || error.message
+        === 'Currency details are unavailable.'
+    )
+  ) {
+    return error.message;
+  }
+
+  return toUserFacingError(
+    error,
+    'generic',
+  );
+}
 
 export function SixJarScreen() {
   const router =
@@ -59,7 +98,7 @@ export function SixJarScreen() {
 
   const profile =
     profileQuery.data
-      ?? null;
+    ?? null;
 
   const [
     incomeText,
@@ -75,7 +114,6 @@ export function SixJarScreen() {
       null,
     );
 
-
   const currency =
     useMemo(
       () =>
@@ -84,9 +122,9 @@ export function SixJarScreen() {
               reference.data
                 ?.currencies
                 .find(
-                  (item) =>
-                    item.code ===
-                    profile.currency_code,
+                  item =>
+                    item.code
+                    === profile.currency_code,
                 )
               ?? null
             )
@@ -96,7 +134,6 @@ export function SixJarScreen() {
         reference.data,
       ],
     );
-
 
   useEffect(() => {
     // Calculator input changes intentionally clear stale validation feedback.
@@ -111,7 +148,6 @@ export function SixJarScreen() {
   }, [
     profile?.id,
   ]);
-
 
   async function calculate() {
     setErrorMessage(
@@ -143,242 +179,230 @@ export function SixJarScreen() {
         );
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'Could not calculate the allocation.',
+        sixJarErrorMessage(
+          error,
+        ),
       );
     }
   }
-
 
   if (
     profileQuery.isLoading
   ) {
     return (
-      <View
-        style={
-          styles.centered
-        }
-      >
-        <Text
-          style={
-            styles.muted
-          }
-        >
-          Loading Six Jars…
-        </Text>
+      <View style={styles.centered}>
+        <StatePanel
+          loading
+          title="Loading Six Jars"
+          description="Preparing your allocation plan."
+        />
       </View>
     );
   }
 
+  if (
+    profileQuery.error
+  ) {
+    return (
+      <View style={styles.centered}>
+        <StatePanel
+          title="Six Jars unavailable"
+          description={
+            toUserFacingError(
+              profileQuery.error,
+              'generic',
+            )
+          }
+          icon="alert-circle-outline"
+          tone="danger"
+          action={
+            <AppButton
+              label="Try again"
+              variant="secondary"
+              fullWidth={false}
+              onPress={() => {
+                void profileQuery.refetch();
+              }}
+            />
+          }
+        />
+      </View>
+    );
+  }
 
   return (
     <ScrollView
-      style={
-        styles.screen
-      }
+      style={styles.screen}
       contentContainerStyle={
         styles.content
       }
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
+      showsVerticalScrollIndicator={false}
     >
-      <Text
-        style={
-          styles.eyebrow
-        }
-      >
-        SIX JARS
-      </Text>
+      <View style={styles.header}>
+        <Text style={styles.eyebrow}>
+          SIX JARS
+        </Text>
 
-      <Text
-        style={
-          styles.title
-        }
-      >
-        Give every income amount a job.
-      </Text>
+        <Text
+          accessibilityRole="header"
+          style={styles.title}
+        >
+          Give every income amount a job.
+        </Text>
 
-      <Text
-        style={
-          styles.subtitle
-        }
-      >
-        Six Jars is a planning tool. Suggested allocations never move money or change account balances.
-      </Text>
-
+        <Text style={styles.subtitle}>
+          Use your preferred percentage split to plan an income amount. Nothing moves between accounts unless you create a real transaction or transfer.
+        </Text>
+      </View>
 
       {!profile ? (
-        <View
-          style={
-            styles.setupCard
-          }
-        >
-          <Text
-            style={
-              styles.setupTitle
-            }
-          >
+        <View style={styles.setupCard}>
+          <View style={styles.setupIcon}>
+            <Ionicons
+              name="grid-outline"
+              size={28}
+              color={
+                colors.primary
+              }
+            />
+          </View>
+
+          <Text style={styles.setupTitle}>
             Set up your allocation rules
           </Text>
 
-          <Text
-            style={
-              styles.setupBody
-            }
-          >
-            Start with the classic six-jar split, then adjust percentages to fit your own plan.
+          <Text style={styles.setupBody}>
+            Start with the classic six-jar approach, then adjust each percentage to fit your own priorities.
           </Text>
 
-          <Pressable
-            accessibilityRole="button"
+          <AppButton
+            label="Set up Six Jars"
+            icon="options-outline"
             onPress={() => {
               router.push(
                 '/six-jars-setup' as never,
               );
             }}
-            style={
-              styles.primaryButton
-            }
-          >
-            <Text
-              style={
-                styles.primaryButtonText
-              }
-            >
-              Set up Six Jars
-            </Text>
-          </Pressable>
+          />
         </View>
       ) : (
         <>
-          <View
-            style={
-              styles.profileHeader
-            }
-          >
-            <View
-              style={
-                styles.profileHeaderCopy
-              }
-            >
-              <Text
-                style={
-                  styles.profileName
-                }
-              >
-                {profile.name}
-              </Text>
+          <View style={styles.profileCard}>
+            <View style={styles.profileHeader}>
+              <View style={styles.profileIdentity}>
+                <View style={styles.profileIcon}>
+                  <Ionicons
+                    name="grid-outline"
+                    size={21}
+                    color={
+                      colors.primary
+                    }
+                  />
+                </View>
 
-              <Text
-                style={
-                  styles.profileMeta
-                }
-              >
-                {profile.currency_code}
-                {' · '}
-                {profile.jars.length}
-                {' '}
-                jars
-              </Text>
-            </View>
-
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => {
-                router.push(
-                  '/six-jars-setup' as never,
-                );
-              }}
-              style={
-                styles.editButton
-              }
-            >
-              <Text
-                style={
-                  styles.editButtonText
-                }
-              >
-                Edit
-              </Text>
-            </Pressable>
-          </View>
-
-
-          <View
-            style={
-              styles.jarGrid
-            }
-          >
-            {profile.jars.map(
-              (jar) => (
-                <View
-                  key={
-                    jar.id
-                  }
-                  style={
-                    styles.jarCard
-                  }
-                >
+                <View style={styles.profileHeaderCopy}>
                   <Text
                     numberOfLines={1}
-                    style={
-                      styles.jarName
-                    }
+                    style={styles.profileName}
                   >
-                    {jar.name}
+                    {profile.name}
                   </Text>
 
-                  <Text
-                    style={
-                      styles.jarPercent
-                    }
-                  >
-                    {basisPointsToPercentText(
-                      jar.percentage_basis_points,
-                    )}
+                  <Text style={styles.profileMeta}>
+                    {profile.currency_code}
+                    {'  |  '}
+                    {profile.jars.length}
+                    {' jars'}
                   </Text>
                 </View>
-              ),
-            )}
+              </View>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Edit Six Jars plan"
+                onPress={() => {
+                  router.push(
+                    '/six-jars-setup' as never,
+                  );
+                }}
+                style={({ pressed }) => [
+                  styles.editButton,
+                  pressed
+                    ? styles.editButtonPressed
+                    : null,
+                ]}
+              >
+                <Ionicons
+                  name="create-outline"
+                  size={17}
+                  color={
+                    colors.primary
+                  }
+                />
+
+                <Text style={styles.editButtonText}>
+                  Edit
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.jarGrid}>
+              {profile.jars.map(
+                jar => (
+                  <View
+                    key={jar.id}
+                    style={styles.jarCard}
+                  >
+                    <Text
+                      numberOfLines={1}
+                      style={styles.jarName}
+                    >
+                      {jar.name}
+                    </Text>
+
+                    <Text style={styles.jarPercent}>
+                      {basisPointsToPercentText(
+                        jar.percentage_basis_points,
+                      )}
+                    </Text>
+                  </View>
+                ),
+              )}
+            </View>
           </View>
 
+          <View style={styles.calculatorCard}>
+            <View style={styles.calculatorHeading}>
+              <View style={styles.calculatorIcon}>
+                <Ionicons
+                  name="calculator-outline"
+                  size={20}
+                  color={
+                    colors.textOnPrimary
+                  }
+                />
+              </View>
 
-          <View
-            style={
-              styles.calculatorCard
-            }
-          >
-            <Text
-              style={
-                styles.sectionEyebrow
-              }
-            >
-              ALLOCATION CALCULATOR
-            </Text>
+              <View style={styles.calculatorHeadingCopy}>
+                <Text style={styles.sectionEyebrow}>
+                  ALLOCATION CALCULATOR
+                </Text>
 
-            <Text
-              style={
-                styles.sectionTitle
-              }
-            >
-              Enter an income amount
-            </Text>
+                <Text style={styles.sectionTitle}>
+                  Split an income amount
+                </Text>
+              </View>
+            </View>
 
-            <View
-              style={
-                styles.amountRow
-              }
-            >
-              <Text
-                style={
-                  styles.currencyPrefix
-                }
-              >
+            <View style={styles.amountRow}>
+              <Text style={styles.currencyPrefix}>
                 {profile.currency_code}
               </Text>
 
               <TextInput
+                accessibilityLabel="Income amount to allocate"
                 value={
                   incomeText
                 }
@@ -387,14 +411,26 @@ export function SixJarScreen() {
                 }
                 keyboardType="decimal-pad"
                 placeholder="0.00"
-                style={
-                  styles.amountInput
+                placeholderTextColor={
+                  colors.textTertiary
                 }
+                selectionColor={
+                  colors.focus
+                }
+                style={styles.amountInput}
               />
             </View>
 
-            <Pressable
-              accessibilityRole="button"
+            <AppButton
+              label={
+                calculator.isPending
+                  ? 'Calculating...'
+                  : 'Calculate allocation'
+              }
+              icon="calculator-outline"
+              loading={
+                calculator.isPending
+              }
               disabled={
                 calculator.isPending
                 || !incomeText.trim()
@@ -402,151 +438,97 @@ export function SixJarScreen() {
               onPress={() => {
                 void calculate();
               }}
-              style={[
-                styles.primaryButton,
-
-                (
-                  calculator.isPending
-                  || !incomeText.trim()
-                )
-                  ? styles.disabled
-                  : null,
-              ]}
-            >
-              <Text
-                style={
-                  styles.primaryButtonText
-                }
-              >
-                {calculator.isPending
-                  ? 'Calculating…'
-                  : 'Calculate allocation'}
-              </Text>
-            </Pressable>
+            />
           </View>
 
-
           {errorMessage ? (
-            <View
-              style={
-                styles.errorCard
+            <InlineNotice
+              tone="error"
+              message={
+                errorMessage
               }
-            >
-              <Text
-                style={
-                  styles.errorText
-                }
-              >
-                {errorMessage}
-              </Text>
-            </View>
+            />
           ) : null}
 
-
           {calculator.data ? (
-            <View
-              style={
-                styles.resultsCard
-              }
-            >
-              <Text
-                style={
-                  styles.sectionEyebrow
-                }
-              >
-                SUGGESTED PLAN
-              </Text>
+            <View style={styles.resultsCard}>
+              <View style={styles.resultsHeader}>
+                <View>
+                  <Text style={styles.resultsEyebrow}>
+                    SUGGESTED PLAN
+                  </Text>
 
-              <Text
-                style={
-                  styles.resultsTitle
-                }
-              >
-                {calculator.data.currency_code}{' '}
-                {formatMinor(
-                  calculator.data.income_minor,
-                  currency?.minorUnit
-                    ?? 2,
-                )}
-              </Text>
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
+                    style={styles.resultsTitle}
+                  >
+                    {calculator.data.currency_code}{' '}
+                    {formatMinor(
+                      calculator.data.income_minor,
+                      currency?.minorUnit
+                        ?? 2,
+                    )}
+                  </Text>
+                </View>
 
-              <View
-                style={
-                  styles.resultList
-                }
-              >
+                <View style={styles.planBadge}>
+                  <Text style={styles.planBadgeText}>
+                    Planning only
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.resultList}>
                 {calculator.data.jars.map(
-                  (jar) => (
+                  (
+                    jar,
+                    index,
+                  ) => (
                     <View
-                      key={
-                        jar.id
-                      }
-                      style={
-                        styles.resultRow
-                      }
+                      key={jar.id}
                     >
-                      <View
-                        style={
-                          styles.resultCopy
-                        }
-                      >
-                        <Text
-                          style={
-                            styles.resultName
-                          }
-                        >
-                          {jar.name}
-                        </Text>
+                      {index > 0 ? (
+                        <View style={styles.divider} />
+                      ) : null}
+
+                      <View style={styles.resultRow}>
+                        <View style={styles.resultCopy}>
+                          <Text style={styles.resultName}>
+                            {jar.name}
+                          </Text>
+
+                          <Text style={styles.resultPercent}>
+                            {basisPointsToPercentText(
+                              jar.percentage_basis_points,
+                            )}
+                          </Text>
+                        </View>
 
                         <Text
-                          style={
-                            styles.resultPercent
-                          }
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.72}
+                          style={styles.resultAmount}
                         >
-                          {basisPointsToPercentText(
-                            jar.percentage_basis_points,
+                          {calculator.data.currency_code}{' '}
+                          {formatMinor(
+                            jar.suggested_amount_minor,
+                            currency?.minorUnit
+                              ?? 2,
                           )}
                         </Text>
                       </View>
-
-                      <Text
-                        style={
-                          styles.resultAmount
-                        }
-                      >
-                        {calculator.data.currency_code}{' '}
-                        {formatMinor(
-                          jar.suggested_amount_minor,
-                          currency?.minorUnit
-                            ?? 2,
-                        )}
-                      </Text>
                     </View>
                   ),
                 )}
               </View>
 
-              <View
-                style={
-                  styles.planningNote
-                }
-              >
-                <Text
-                  style={
-                    styles.planningTitle
-                  }
-                >
-                  Planning only
-                </Text>
-
-                <Text
-                  style={
-                    styles.planningText
-                  }
-                >
-                  These numbers are suggestions. No transaction, transfer, or account-balance change has been created.
-                </Text>
-              </View>
+              <InlineNotice
+                tone="info"
+                message="These are planning suggestions only. No transaction, transfer, or account-balance change is created."
+              />
             </View>
           ) : null}
         </>
@@ -555,296 +537,510 @@ export function SixJarScreen() {
   );
 }
 
-
 const styles =
   StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: colors.background,
-    },
-
-    content: {
-      width: '100%',
-      maxWidth: layout.contentMaxWidth,
-      alignSelf: 'center',
-      paddingHorizontal: layout.screenHorizontalPadding,
-      paddingTop: 22,
-      paddingBottom: 120,
+      backgroundColor:
+        colors.background,
     },
 
     centered: {
       flex: 1,
-      alignItems: 'center',
       justifyContent: 'center',
-      padding: 24,
-      backgroundColor: colors.background,
+      paddingHorizontal:
+        layout.screenHorizontalPadding,
+      backgroundColor:
+        colors.background,
     },
 
-    muted: {
-      color: colors.textSecondary,
-      fontSize: typography.small,
+    content: {
+      flexGrow: 1,
+      width: '100%',
+      maxWidth:
+        layout.contentMaxWidth,
+      alignSelf: 'center',
+      gap:
+        spacing.lg,
+      paddingHorizontal:
+        layout.screenHorizontalPadding,
+      paddingTop:
+        spacing.lg,
+      paddingBottom:
+        spacing.xl,
+    },
+
+    header: {
+      gap:
+        spacing.xs,
     },
 
     eyebrow: {
-      color: colors.primary,
-      fontSize: typography.caption,
-      fontWeight: typography.weightBold,
-      letterSpacing: 1.4,
+      color:
+        colors.primary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+      fontWeight:
+        typography.weightExtraBold,
+      letterSpacing: 1.1,
     },
 
     title: {
-      marginTop: 8,
-      color: colors.text,
-      fontSize: typography.title,
-      lineHeight: 35,
-      fontWeight: typography.weightBold,
+      color:
+        colors.text,
+      fontSize:
+        typography.title,
+      lineHeight:
+        typography.lineHeightTitle,
+      fontWeight:
+        typography.weightExtraBold,
+      letterSpacing: -0.6,
     },
 
     subtitle: {
-      marginTop: 8,
-      marginBottom: 20,
-      color: colors.textSecondary,
-      fontSize: typography.small,
-      lineHeight: 21,
+      maxWidth: 460,
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
     },
 
     setupCard: {
-      padding: 20,
-      borderRadius: radii.lg,
+      alignItems: 'center',
+      gap:
+        spacing.sm,
+      padding:
+        spacing.xl,
+      borderRadius:
+        radii.xl,
       borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
-      ...elevation.card
+      borderColor:
+        colors.border,
+      backgroundColor:
+        colors.surface,
+      ...elevation.card,
+    },
+
+    setupIcon: {
+      width: 56,
+      height: 56,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius:
+        radii.lg,
+      backgroundColor:
+        colors.primarySoft,
+      marginBottom:
+        spacing.xs,
     },
 
     setupTitle: {
-      color: colors.text,
-      fontSize: typography.subheading,
-      fontWeight: typography.weightBold,
+      color:
+        colors.text,
+      fontSize:
+        typography.subheading,
+      lineHeight:
+        typography.lineHeightSubheading,
+      fontWeight:
+        typography.weightBold,
+      textAlign: 'center',
     },
 
     setupBody: {
-      marginTop: 7,
-      color: colors.textSecondary,
-      fontSize: typography.small,
-      lineHeight: 20,
+      maxWidth: 390,
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+      textAlign: 'center',
     },
 
-    primaryButton: {
-      minHeight: 50,
-      marginTop: 18,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.md,
-      backgroundColor: colors.primary,
-    },
-
-    primaryButtonText: {
-      color: colors.textOnPrimary,
-      fontSize: typography.small,
-      fontWeight: typography.weightBold,
-    },
-
-    disabled: {
-      opacity: 0.45,
+    profileCard: {
+      gap:
+        spacing.lg,
+      padding:
+        spacing.md,
+      borderRadius:
+        radii.lg,
+      borderWidth: 1,
+      borderColor:
+        colors.border,
+      backgroundColor:
+        colors.surface,
+      ...elevation.card,
     },
 
     profileHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 14,
-      marginBottom: 13,
+      justifyContent:
+        'space-between',
+      gap:
+        spacing.sm,
+    },
+
+    profileIdentity: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap:
+        spacing.sm,
+    },
+
+    profileIcon: {
+      width: 42,
+      height: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius:
+        radii.md,
+      backgroundColor:
+        colors.primarySoft,
     },
 
     profileHeaderCopy: {
       flex: 1,
+      minWidth: 0,
     },
 
     profileName: {
-      color: colors.text,
-      fontSize: typography.subheading,
-      fontWeight: typography.weightBold,
+      color:
+        colors.text,
+      fontSize:
+        typography.body,
+      lineHeight:
+        typography.lineHeightBody,
+      fontWeight:
+        typography.weightBold,
     },
 
     profileMeta: {
-      marginTop: 3,
-      color: colors.textSecondary,
-      fontSize: typography.caption,
+      marginTop:
+        spacing.xxs,
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
     },
 
     editButton: {
-      paddingHorizontal: 14,
-      paddingVertical: 9,
-      borderRadius: radii.sm,
+      minHeight:
+        layout.touchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap:
+        spacing.xs,
+      paddingHorizontal:
+        spacing.sm,
+      borderRadius:
+        radii.md,
       borderWidth: 1,
-      borderColor: colors.borderStrong,
-      backgroundColor: colors.surface,
+      borderColor:
+        colors.borderStrong,
+      backgroundColor:
+        colors.surface,
+    },
+
+    editButtonPressed: {
+      backgroundColor:
+        colors.surfaceMuted,
     },
 
     editButtonText: {
-      color: colors.primary,
-      fontSize: typography.caption,
-      fontWeight: typography.weightBold,
+      color:
+        colors.primary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+      fontWeight:
+        typography.weightBold,
     },
 
     jarGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 9,
+      gap:
+        spacing.sm,
     },
 
     jarCard: {
       width: '48%',
-      minHeight: 86,
-      padding: 13,
-      borderRadius: radii.md,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      ...elevation.card
+      minHeight: 94,
+      justifyContent:
+        'space-between',
+      padding:
+        spacing.md,
+      borderRadius:
+        radii.md,
+      backgroundColor:
+        colors.surfaceMuted,
     },
 
     jarName: {
-      color: colors.textSecondary,
-      fontSize: typography.caption,
-      fontWeight: typography.weightSemibold,
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+      fontWeight:
+        typography.weightSemibold,
     },
 
     jarPercent: {
-      marginTop: 7,
-      color: colors.primary,
-      fontSize: typography.heading,
-      fontWeight: typography.weightBold,
+      marginTop:
+        spacing.sm,
+      color:
+        colors.primary,
+      fontSize:
+        typography.heading,
+      lineHeight:
+        typography.lineHeightHeading,
+      fontWeight:
+        typography.weightExtraBold,
     },
 
     calculatorCard: {
-      marginTop: 18,
-      padding: 18,
-      borderRadius: radii.lg,
-      backgroundColor: colors.text,
-      ...elevation.card
+      gap:
+        spacing.md,
+      padding:
+        spacing.lg,
+      borderRadius:
+        radii.xl,
+      backgroundColor:
+        colors.primary,
+      ...elevation.floating,
+    },
+
+    calculatorHeading: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap:
+        spacing.sm,
+    },
+
+    calculatorIcon: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius:
+        radii.md,
+      backgroundColor:
+        colors.focus,
+    },
+
+    calculatorHeadingCopy: {
+      flex: 1,
+      minWidth: 0,
     },
 
     sectionEyebrow: {
-      color: colors.accentStrong,
-      fontSize: typography.caption,
-      fontWeight: typography.weightBold,
-      letterSpacing: 1.1,
+      color:
+        colors.accentStrong,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+      fontWeight:
+        typography.weightBold,
+      letterSpacing: 1,
     },
 
     sectionTitle: {
-      marginTop: 5,
-      color: colors.textOnPrimary,
-      fontSize: typography.subheading,
-      fontWeight: typography.weightBold,
+      marginTop:
+        spacing.xxs,
+      color:
+        colors.textOnPrimary,
+      fontSize:
+        typography.subheading,
+      lineHeight:
+        typography.lineHeightSubheading,
+      fontWeight:
+        typography.weightBold,
     },
 
     amountRow: {
+      minHeight: 74,
       flexDirection: 'row',
       alignItems: 'center',
-      minHeight: 60,
-      marginTop: 15,
-      paddingHorizontal: 14,
-      borderRadius: radii.md,
-      backgroundColor: colors.surface,
+      paddingHorizontal:
+        spacing.md,
+      borderRadius:
+        radii.lg,
+      backgroundColor:
+        colors.surface,
     },
 
     currencyPrefix: {
-      marginRight: 9,
-      color: colors.textSecondary,
-      fontSize: typography.small,
-      fontWeight: typography.weightBold,
+      minWidth: 46,
+      marginRight:
+        spacing.sm,
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+      fontWeight:
+        typography.weightBold,
     },
 
     amountInput: {
       flex: 1,
-      color: colors.text,
-      fontSize: typography.heading,
-      fontWeight: typography.weightBold,
-    },
-
-    errorCard: {
-      marginTop: 14,
-      padding: 13,
-      borderRadius: radii.md,
-      backgroundColor: colors.dangerSurface,
-    },
-
-    errorText: {
-      color: colors.danger,
-      fontSize: typography.small,
-      lineHeight: 18,
+      minHeight: 66,
+      color:
+        colors.text,
+      fontSize:
+        typography.heading,
+      lineHeight:
+        typography.lineHeightHeading,
+      fontWeight:
+        typography.weightExtraBold,
     },
 
     resultsCard: {
-      marginTop: 16,
-      padding: 18,
-      borderRadius: radii.lg,
-      backgroundColor: colors.surface,
+      gap:
+        spacing.md,
+      padding:
+        spacing.md,
+      borderRadius:
+        radii.lg,
       borderWidth: 1,
-      borderColor: colors.border,
-      ...elevation.card
+      borderColor:
+        colors.border,
+      backgroundColor:
+        colors.surface,
+      ...elevation.card,
+    },
+
+    resultsHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent:
+        'space-between',
+      gap:
+        spacing.sm,
+    },
+
+    resultsEyebrow: {
+      color:
+        colors.primary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+      fontWeight:
+        typography.weightBold,
+      letterSpacing: 1,
     },
 
     resultsTitle: {
-      marginTop: 5,
-      color: colors.text,
-      fontSize: typography.heading,
-      fontWeight: typography.weightBold,
+      marginTop:
+        spacing.xs,
+      color:
+        colors.text,
+      fontSize:
+        typography.heading,
+      lineHeight:
+        typography.lineHeightHeading,
+      fontWeight:
+        typography.weightExtraBold,
+      letterSpacing: -0.4,
+    },
+
+    planBadge: {
+      paddingHorizontal:
+        spacing.sm,
+      paddingVertical:
+        spacing.xs,
+      borderRadius:
+        radii.pill,
+      backgroundColor:
+        colors.infoSurface,
+    },
+
+    planBadgeText: {
+      color:
+        colors.info,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+      fontWeight:
+        typography.weightBold,
     },
 
     resultList: {
-      marginTop: 14,
+      borderRadius:
+        radii.md,
+      overflow: 'hidden',
     },
 
     resultRow: {
+      minHeight: 64,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
-      paddingVertical: 11,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.border,
+      gap:
+        spacing.sm,
+      paddingVertical:
+        spacing.sm,
+    },
+
+    divider: {
+      height:
+        StyleSheet.hairlineWidth,
+      backgroundColor:
+        colors.border,
     },
 
     resultCopy: {
       flex: 1,
+      minWidth: 0,
     },
 
     resultName: {
-      color: colors.text,
-      fontSize: typography.small,
-      fontWeight: typography.weightBold,
+      color:
+        colors.text,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+      fontWeight:
+        typography.weightBold,
     },
 
     resultPercent: {
-      marginTop: 2,
-      color: colors.textTertiary,
-      fontSize: typography.caption,
+      marginTop:
+        spacing.xxs,
+      color:
+        colors.textTertiary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
     },
 
     resultAmount: {
-      color: colors.primary,
-      fontSize: typography.small,
-      fontWeight: typography.weightBold,
-    },
-
-    planningNote: {
-      marginTop: 15,
-      padding: 13,
-      borderRadius: radii.md,
-      backgroundColor: colors.surfaceMuted,
-    },
-
-    planningTitle: {
-      color: colors.primary,
-      fontSize: typography.caption,
-      fontWeight: typography.weightBold,
-    },
-
-    planningText: {
-      marginTop: 3,
-      color: colors.textSecondary,
-      fontSize: typography.caption,
-      lineHeight: 17,
+      maxWidth: '48%',
+      color:
+        colors.primary,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+      fontWeight:
+        typography.weightExtraBold,
+      textAlign: 'right',
     },
   });

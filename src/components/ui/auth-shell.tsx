@@ -1,4 +1,9 @@
-import type { ReactNode } from 'react';
+import Ionicons from '@expo/vector-icons/Ionicons';
+
+import type {
+  ReactNode,
+} from 'react';
+
 import {
   KeyboardAvoidingView,
   Platform,
@@ -7,17 +12,19 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
+import {
+  SafeAreaView,
+} from 'react-native-safe-area-context';
 
 import {
   colors,
+  elevation,
   layout,
   radii,
   spacing,
   typography,
 } from '@/design/tokens';
-
-import { BrandMark } from './brand-mark';
 
 type AuthShellProps = {
   eyebrow: string;
@@ -27,6 +34,33 @@ type AuthShellProps = {
   footer?: ReactNode;
 };
 
+function TrustPoint({
+  icon,
+  label,
+}: {
+  icon:
+    keyof typeof Ionicons.glyphMap;
+  label: string;
+}) {
+  return (
+    <View style={styles.trustPoint}>
+      <View style={styles.trustIcon}>
+        <Ionicons
+          name={icon}
+          size={16}
+          color={
+            colors.textOnPrimary
+          }
+        />
+      </View>
+
+      <Text style={styles.trustLabel}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 export function AuthShell({
   eyebrow,
   title,
@@ -35,12 +69,19 @@ export function AuthShell({
   footer,
 }: AuthShellProps) {
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView
+      edges={[
+        'left',
+        'right',
+        'bottom',
+      ]}
+      style={styles.safeArea}
+    >
       <KeyboardAvoidingView
         behavior={
           Platform.OS === 'ios'
             ? 'padding'
-            : undefined
+            : 'height'
         }
         style={styles.flex}
       >
@@ -49,34 +90,78 @@ export function AuthShell({
             styles.scrollContent
           }
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={
+            Platform.OS === 'ios'
+              ? 'interactive'
+              : 'on-drag'
+          }
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.content}>
-            <BrandMark />
+          <View style={styles.heroWrap}>
+            <View style={styles.hero}>
+              <View style={styles.brandRow}>
+                <View style={styles.brandIcon}>
+                  <Ionicons
+                    name="wallet-outline"
+                    size={23}
+                    color={
+                      colors.primary
+                    }
+                  />
+                </View>
 
-            <View style={styles.headingGroup}>
-              <Text style={styles.eyebrow}>
-                {eyebrow}
-              </Text>
+                <View style={styles.brandCopy}>
+                  <Text style={styles.brandName}>
+                    Finance Coach
+                  </Text>
 
-              <Text style={styles.title}>
-                {title}
-              </Text>
-
-              <Text style={styles.subtitle}>
-                {subtitle}
-              </Text>
-            </View>
-
-            <View style={styles.card}>
-              {children}
-            </View>
-
-            {footer ? (
-              <View style={styles.footer}>
-                {footer}
+                  <Text style={styles.brandTagline}>
+                    Money clarity, one step at a time.
+                  </Text>
+                </View>
               </View>
-            ) : null}
+
+              <View style={styles.heroCopy}>
+                <Text style={styles.eyebrow}>
+                  {eyebrow}
+                </Text>
+
+                <Text
+                  accessibilityRole="header"
+                  style={styles.title}
+                >
+                  {title}
+                </Text>
+
+                <Text style={styles.subtitle}>
+                  {subtitle}
+                </Text>
+              </View>
+
+              <View style={styles.trustRow}>
+                <TrustPoint
+                  icon="shield-checkmark-outline"
+                  label="Private account"
+                />
+
+                <TrustPoint
+                  icon="checkmark-circle-outline"
+                  label="Clear records"
+                />
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.formSection}>
+            <View style={styles.formContent}>
+              {children}
+
+              {footer ? (
+                <View style={styles.footer}>
+                  {footer}
+                </View>
+              ) : null}
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -91,58 +176,192 @@ const styles = StyleSheet.create({
 
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor:
+      colors.primary,
   },
 
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+    backgroundColor:
+      colors.primary,
   },
 
-  content: {
+  heroWrap: {
     width: '100%',
-    maxWidth: layout.contentMaxWidth,
-    alignSelf: 'center',
-    gap: spacing.xl,
+    backgroundColor:
+      colors.primary,
   },
 
-  headingGroup: {
-    gap: spacing.sm,
+  hero: {
+    width: '100%',
+    maxWidth:
+      layout.contentMaxWidth,
+    alignSelf: 'center',
+    paddingHorizontal:
+      layout.screenHorizontalPadding,
+    paddingTop:
+      spacing.md,
+    paddingBottom:
+      spacing.xl,
+    gap:
+      spacing.xl,
+  },
+
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap:
+      spacing.sm,
+  },
+
+  brandIcon: {
+    width: 44,
+    height: 44,
+    borderRadius:
+      radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor:
+      colors.white,
+  },
+
+  brandCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  brandName: {
+    color:
+      colors.textOnPrimary,
+    fontSize:
+      typography.body,
+    lineHeight:
+      typography.lineHeightBody,
+    fontWeight:
+      typography.weightExtraBold,
+  },
+
+  brandTagline: {
+    color:
+      colors.accentStrong,
+    fontSize:
+      typography.caption,
+    lineHeight:
+      typography.lineHeightCaption,
+  },
+
+  heroCopy: {
+    gap:
+      spacing.sm,
   },
 
   eyebrow: {
-    color: colors.success,
-    fontSize: typography.small,
-    fontWeight: typography.weightExtraBold,
-    letterSpacing: 0.4,
+    color:
+      colors.accentStrong,
+    fontSize:
+      typography.caption,
+    lineHeight:
+      typography.lineHeightCaption,
+    fontWeight:
+      typography.weightBold,
+    letterSpacing: 1.1,
     textTransform: 'uppercase',
   },
 
   title: {
-    color: colors.text,
-    fontSize: typography.title,
-    lineHeight: typography.lineHeightTitle,
-    fontWeight: '800',
-    letterSpacing: -0.8,
+    color:
+      colors.textOnPrimary,
+    fontSize:
+      typography.title,
+    lineHeight:
+      typography.lineHeightTitle,
+    fontWeight:
+      typography.weightExtraBold,
+    letterSpacing: -0.9,
   },
 
   subtitle: {
-    color: colors.textSecondary,
-    fontSize: typography.body,
-    lineHeight: typography.lineHeightBody,
+    color:
+      colors.accent,
+    fontSize:
+      typography.body,
+    lineHeight:
+      typography.lineHeightBody,
   },
 
-  card: {
-    padding: spacing.lg,
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
+  trustRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap:
+      spacing.sm,
+  },
+
+  trustPoint: {
+    minHeight: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap:
+      spacing.xs,
+    paddingHorizontal:
+      spacing.sm,
+    paddingVertical:
+      spacing.xs,
+    borderRadius:
+      radii.pill,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor:
+      colors.focus,
+  },
+
+  trustIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor:
+      colors.focus,
+  },
+
+  trustLabel: {
+    color:
+      colors.textOnPrimary,
+    fontSize:
+      typography.caption,
+    lineHeight:
+      typography.lineHeightCaption,
+    fontWeight:
+      typography.weightSemibold,
+  },
+
+  formSection: {
+    flexGrow: 1,
+    backgroundColor:
+      colors.background,
+    borderTopLeftRadius:
+      radii.xl,
+    borderTopRightRadius:
+      radii.xl,
+    ...elevation.floating,
+  },
+
+  formContent: {
+    width: '100%',
+    maxWidth:
+      layout.contentMaxWidth,
+    alignSelf: 'center',
+    paddingHorizontal:
+      layout.screenHorizontalPadding,
+    paddingTop:
+      spacing.lg,
+    paddingBottom:
+      spacing.xl,
+    gap:
+      spacing.lg,
   },
 
   footer: {
-    paddingBottom: spacing.lg,
+    paddingTop:
+      spacing.xs,
   },
 });

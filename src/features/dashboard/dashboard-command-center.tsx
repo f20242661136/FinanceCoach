@@ -1,3 +1,5 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useRouter } from 'expo-router';
 import {
   Pressable,
   StyleSheet,
@@ -5,12 +7,8 @@ import {
   View,
 } from 'react-native';
 
-import {
-  AppButton,
-} from '@/components/ui/app-button';
-import {
-  StatePanel,
-} from '@/components/ui/state-panel';
+import { AppButton } from '@/components/ui/app-button';
+import { StatePanel } from '@/components/ui/state-panel';
 import {
   colors,
   elevation,
@@ -19,879 +17,684 @@ import {
   spacing,
   typography,
 } from '@/design/tokens';
-
-import {
-  useRouter,
-} from 'expo-router';
-
-import {
-  useLocalFinanceReferenceData,
-} from '../../offline/sync/use-local-finance-reference-data';
-
-import {
-  formatMinor,
-} from '../budgets/budget-money';
-
+import { useLocalFinanceReferenceData } from '@/offline/sync/use-local-finance-reference-data';
+import { formatMinor } from '../budgets/budget-money';
 import {
   formatBasisPoints,
   monthDisplayLabel,
 } from './dashboard-format';
-
-import {
-  useFinancialDashboardSummary,
-} from './dashboard-query';
-
+import { useFinancialDashboardSummary } from './dashboard-query';
 
 function countLabel(
   value: string,
   singular: string,
   plural: string,
 ): string {
-  return `${
-    value
-  } ${
-    value === '1'
-      ? singular
-      : plural
-  }`;
+  return `${value} ${value === '1' ? singular : plural}`;
 }
 
+function formatAsOf(value: string): string {
+  const parsed = new Date(`${value}T00:00:00`);
 
-export function DashboardCommandCenter() {
-  const router =
-    useRouter();
-
-  const query =
-    useFinancialDashboardSummary();
-
-  const reference =
-    useLocalFinanceReferenceData();
-
-  const summary =
-    query.data;
-
-
-  function minorUnitFor(
-    currencyCode: string,
-  ): number {
-    return (
-      reference.data
-        ?.currencies
-        .find(
-          (currency) =>
-            currency.code ===
-            currencyCode,
-        )
-        ?.minorUnit
-      ?? 2
-    );
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
   }
 
+  return parsed.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  });
+}
 
-  if (
-    query.isLoading
-    && !summary
-  ) {
+function SectionHeader({
+  title,
+  action,
+  onAction,
+}: {
+  title: string;
+  action?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {action && onAction ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${action} ${title}`}
+          hitSlop={8}
+          onPress={onAction}
+          style={({ pressed }) => pressed ? styles.pressed : null}
+        >
+          <Text style={styles.sectionAction}>{action}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+export function DashboardCommandCenter() {
+  const router = useRouter();
+  const query = useFinancialDashboardSummary();
+  const reference = useLocalFinanceReferenceData();
+  const summary = query.data;
+
+  function minorUnitFor(currencyCode: string): number {
+    return reference.data?.currencies.find(
+      currency => currency.code === currencyCode,
+    )?.minorUnit ?? 2;
+  }
+
+  if (query.isLoading && !summary) {
     return (
       <StatePanel
         loading
-        description="Building your financial snapshot..."
+        title="Preparing your overview"
+        description="Bringing together your latest balances and activity."
       />
     );
   }
 
-
-  if (
-    query.error
-    && !summary
-  ) {
+  if (query.error && !summary) {
     return (
       <StatePanel
-        title="Dashboard snapshot unavailable"
-        description="Your saved finance data is still available below."
+        title="Overview unavailable"
+        description="Your saved finance data is still available. Try the overview again when your connection is ready."
         icon="cloud-offline-outline"
         tone="danger"
         action={
           <AppButton
-            label="Retry"
+            label="Try again"
             variant="secondary"
             fullWidth={false}
-            onPress={() => {
-              void query.refetch();
-            }}
+            onPress={() => void query.refetch()}
           />
         }
       />
     );
   }
 
-
   if (!summary) {
     return null;
   }
 
-
   const budgetWarnings =
-    BigInt(
-      summary.budgets
-        .over_budget_count,
-    )
-    +
-    BigInt(
-      summary.budgets
-        .near_limit_count,
-    );
-
+    BigInt(summary.budgets.over_budget_count)
+    + BigInt(summary.budgets.near_limit_count);
+  const hasCashFlow = summary.cash_flow_by_currency.length > 0;
+  const hasBalances = summary.account_balances_by_currency.length > 0;
 
   return (
-    <View
-      style={
-        styles.wrapper
-      }
-    >
-      <View
-        style={
-          styles.headingRow
-        }
-      >
+    <View style={styles.wrapper}>
+      <View style={styles.overviewHeading}>
         <View>
-          <Text
-            style={
-              styles.eyebrow
-            }
-          >
-            FINANCIAL OVERVIEW
+          <Text style={styles.monthLabel}>
+            {monthDisplayLabel(summary.month_start)}
           </Text>
-
-          <Text
-            style={
-              styles.heading
-            }
-          >
-            {monthDisplayLabel(
-              summary.month_start,
-            )}
-          </Text>
+          <Text style={styles.asOf}>Updated {formatAsOf(summary.as_of)}</Text>
         </View>
-
-        <Text
-          style={
-            styles.asOf
-          }
-        >
-          As of {summary.as_of}
-        </Text>
       </View>
 
-
-      <View
-        style={
-          styles.quickActions
-        }
-      >
-        <AppButton
-          label="Add transaction"
-          icon="add"
-          fullWidth={false}
-          style={styles.quickAction}
-          onPress={() => {
-            router.push(
-              '/quick-add' as never,
-            );
-          }}
-        />
-
-        <AppButton
-          label="Transfer"
-          icon="swap-horizontal"
-          variant="secondary"
-          fullWidth={false}
-          style={styles.quickAction}
-          onPress={() => {
-            router.push(
-              '/transfer' as never,
-            );
-          }}
-        />
-      </View>
-
-      {summary.cash_flow_by_currency.length === 0 ? (
-        <View
-          style={
-            styles.emptyCard
-          }
-        >
-          <Text
-            style={
-              styles.emptyTitle
-            }
-          >
-            No income or expenses this month
-          </Text>
-
-          <Text
-            style={
-              styles.emptyBody
-            }
-          >
-            Add your first transaction to start building the monthly picture.
-          </Text>
+      {!hasCashFlow ? (
+        <View style={styles.emptyHeroCard}>
+          <View style={styles.emptyHeroIcon}>
+            <Ionicons
+              name="sparkles-outline"
+              size={22}
+              color={colors.primary}
+            />
+          </View>
+          <View style={styles.emptyHeroCopy}>
+            <Text style={styles.emptyHeroTitle}>Start with one real transaction</Text>
+            <Text style={styles.emptyHeroBody}>
+              Your monthly picture will appear after you record income or spending.
+            </Text>
+          </View>
+          <AppButton
+            label="Add transaction"
+            icon="add"
+            fullWidth={false}
+            onPress={() => router.push('/quick-add' as never)}
+          />
         </View>
       ) : (
-        <View
-          style={
-            styles.currencyList
-          }
-        >
-          {summary.cash_flow_by_currency.map(
-            (cashFlow) => {
-              const minorUnit =
-                minorUnitFor(
-                  cashFlow.currency_code,
-                );
+        <View style={styles.cashFlowList}>
+          {summary.cash_flow_by_currency.map(cashFlow => {
+            const minorUnit = minorUnitFor(cashFlow.currency_code);
+            const isNegative = cashFlow.net_minor.startsWith('-');
 
-              return (
-                <View
-                  key={
-                    cashFlow.currency_code
-                  }
-                  style={
-                    styles.cashFlowCard
-                  }
-                >
-                  <View
-                    style={
-                      styles.cashFlowHeader
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.currencyCode
-                      }
-                    >
-                      {cashFlow.currency_code}
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.savingsRate
-                      }
-                    >
-                      Savings rate{' '}
-                      {formatBasisPoints(
-                        cashFlow.savings_rate_basis_points,
-                      )}
-                    </Text>
-                  </View>
-
-
-                  <View
-                    style={
-                      styles.metrics
-                    }
-                  >
-                    <View
-                      style={
-                        styles.metric
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.metricLabel
-                        }
-                      >
-                        Income
-                      </Text>
-
-                      <Text
-                        style={
-                          styles.metricValue
-                        }
-                      >
-                        {formatMinor(
-                          cashFlow.income_minor,
-                          minorUnit,
-                        )}
-                      </Text>
-                    </View>
-
-                    <View
-                      style={
-                        styles.metric
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.metricLabel
-                        }
-                      >
-                        Expenses
-                      </Text>
-
-                      <Text
-                        style={
-                          styles.metricValue
-                        }
-                      >
-                        {formatMinor(
-                          cashFlow.expense_minor,
-                          minorUnit,
-                        )}
-                      </Text>
-                    </View>
-
-                    <View
-                      style={
-                        styles.metric
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.metricLabel
-                        }
-                      >
-                        Net
-                      </Text>
-
-                      <Text
-                        style={[
-                          styles.metricValue,
-
-                          cashFlow.net_minor
-                            .startsWith('-')
-                            ? styles.negative
-                            : styles.positive,
-                        ]}
-                      >
-                        {formatMinor(
-                          cashFlow.net_minor,
-                          minorUnit,
-                        )}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              );
-            },
-          )}
-        </View>
-      )}
-
-
-      <View
-        style={
-          styles.balanceCard
-        }
-      >
-        <Text
-          style={
-            styles.sectionEyebrow
-          }
-        >
-          ACTIVE ACCOUNT BALANCES
-        </Text>
-
-        {summary.account_balances_by_currency.length === 0 ? (
-          <Text
-            style={
-              styles.emptyBody
-            }
-          >
-            No active accounts yet.
-          </Text>
-        ) : (
-          summary.account_balances_by_currency.map(
-            (balance) => (
+            return (
               <View
-                key={
-                  balance.currency_code
-                }
-                style={
-                  styles.balanceRow
-                }
+                key={cashFlow.currency_code}
+                style={styles.cashFlowCard}
               >
-                <View>
-                  <Text
-                    style={
-                      styles.balanceCurrency
-                    }
-                  >
-                    {balance.currency_code}
-                  </Text>
+                <View style={styles.cashFlowTop}>
+                  <View>
+                    <Text style={styles.currencyCode}>{cashFlow.currency_code}</Text>
+                    <Text style={styles.cashFlowCaption}>Net this month</Text>
+                  </View>
 
-                  <Text
-                    style={
-                      styles.balanceMeta
-                    }
-                  >
-                    {countLabel(
-                      balance.account_count,
-                      'account',
-                      'accounts',
-                    )}
-                  </Text>
+                  <View style={styles.savingsPill}>
+                    <Text style={styles.savingsPillText}>
+                      Saved {formatBasisPoints(cashFlow.savings_rate_basis_points)}
+                    </Text>
+                  </View>
                 </View>
 
                 <Text
-                  style={
-                    styles.balanceValue
-                  }
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                  style={[
+                    styles.netValue,
+                    isNegative ? styles.netValueNegative : null,
+                  ]}
                 >
-                  {formatMinor(
-                    balance.total_balance_minor,
-                    minorUnitFor(
-                      balance.currency_code,
-                    ),
-                  )}
+                  {formatMinor(cashFlow.net_minor, minorUnit)}
                 </Text>
+
+                <View style={styles.metricsRow}>
+                  <View style={styles.metric}>
+                    <Text style={styles.metricLabel}>Income</Text>
+                    <Text style={styles.metricValue}>
+                      {formatMinor(cashFlow.income_minor, minorUnit)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.metricDivider} />
+
+                  <View style={styles.metric}>
+                    <Text style={styles.metricLabel}>Spent</Text>
+                    <Text style={styles.metricValue}>
+                      {formatMinor(cashFlow.expense_minor, minorUnit)}
+                    </Text>
+                  </View>
+                </View>
               </View>
-            ),
-          )
-        )}
-
-        {summary.account_balances_by_currency.length > 1 ? (
-          <Text
-            style={
-              styles.currencyNote
-            }
-          >
-            Currencies are kept separate. No exchange-rate assumptions are applied.
-          </Text>
-        ) : null}
-      </View>
-
-
-      <View
-        style={
-          styles.signalGrid
-        }
-      >
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => {
-            router.push(
-              '/budgets' as never,
             );
-          }}
-          style={({ pressed }) => [
-            styles.signalCard,
-            pressed
-              && styles.signalCardPressed,
-          ]}
-        >
-          <Text
-            style={
-              styles.signalLabel
-            }
-          >
-            Budgets
-          </Text>
+          })}
+        </View>
+      )}
 
-          <Text
-            style={[
-              styles.signalNumber,
-
-              budgetWarnings >
-                BigInt(0)
-                ? styles.warning
-                : null,
+      {budgetWarnings > BigInt(0) ? (
+        <View style={styles.attentionSection}>
+          <SectionHeader title="Needs your attention" />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${budgetWarnings.toString()} budget warnings. Review budgets.`}
+            onPress={() => router.push('/budgets' as never)}
+            style={({ pressed }) => [
+              styles.attentionCard,
+              pressed ? styles.pressed : null,
             ]}
           >
-            {budgetWarnings.toString()}
-          </Text>
+            <View style={styles.attentionIcon}>
+              <Ionicons
+                name="alert-circle-outline"
+                size={21}
+                color={colors.warning}
+              />
+            </View>
+            <View style={styles.attentionCopy}>
+              <Text style={styles.attentionTitle}>Budget attention</Text>
+              <Text style={styles.attentionBody}>
+                {budgetWarnings.toString()} {budgetWarnings === BigInt(1) ? 'budget is' : 'budgets are'} near or over the limit.
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={colors.textTertiary}
+            />
+          </Pressable>
+        </View>
+      ) : null}
 
-          <Text
-            style={
-              styles.signalBody
-            }
-          >
-            {budgetWarnings ===
-            BigInt(0)
-              ? 'No current warnings'
-              : 'Near or over limit'}
-          </Text>
-        </Pressable>
+      <View style={styles.accountsSection}>
+        <SectionHeader
+          title="Accounts"
+          action="See all"
+          onAction={() => router.push('/accounts' as never)}
+        />
 
+        <View style={styles.balanceCard}>
+          {!hasBalances ? (
+            <View style={styles.balanceEmpty}>
+              <Text style={styles.balanceEmptyTitle}>No active accounts yet</Text>
+              <Text style={styles.balanceEmptyBody}>
+                Add your first account to start tracking balances.
+              </Text>
+              <AppButton
+                label="Add account"
+                variant="secondary"
+                fullWidth={false}
+                onPress={() => router.push('/add-account' as never)}
+              />
+            </View>
+          ) : (
+            summary.account_balances_by_currency.map((balance, index) => (
+              <View key={balance.currency_code}>
+                {index > 0 ? <View style={styles.divider} /> : null}
+                <View style={styles.balanceRow}>
+                  <View style={styles.balanceCopy}>
+                    <Text style={styles.balanceCurrency}>{balance.currency_code}</Text>
+                    <Text style={styles.balanceMeta}>
+                      {countLabel(balance.account_count, 'account', 'accounts')}
+                    </Text>
+                  </View>
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => {
-            router.push(
-              '/goals' as never,
-            );
-          }}
-          style={({ pressed }) => [
-            styles.signalCard,
-            pressed
-              && styles.signalCardPressed,
-          ]}
-        >
-          <Text
-            style={
-              styles.signalLabel
-            }
-          >
-            Goals
-          </Text>
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.75}
+                    style={styles.balanceValue}
+                  >
+                    {formatMinor(
+                      balance.total_balance_minor,
+                      minorUnitFor(balance.currency_code),
+                    )}
+                  </Text>
+                </View>
+              </View>
+            ))
+          )}
 
-          <Text
-            style={
-              styles.signalNumber
-            }
-          >
-            {summary.goals.active_count}
-          </Text>
-
-          <Text
-            style={
-              styles.signalBody
-            }
-          >
-            Active ·{' '}
-            {summary.goals
-              .target_reached_count}{' '}
-            reached
-          </Text>
-        </Pressable>
+          {summary.account_balances_by_currency.length > 1 ? (
+            <View style={styles.currencyNote}>
+              <Ionicons
+                name="information-circle-outline"
+                size={16}
+                color={colors.textTertiary}
+              />
+              <Text style={styles.currencyNoteText}>
+                Currencies stay separate. Finance Coach does not assume exchange rates.
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
 
-
-      <View
-        style={
-          styles.activityStrip
-        }
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Open Finance Coach"
+        onPress={() => router.push('/coach' as never)}
+        style={({ pressed }) => [
+          styles.coachCard,
+          pressed ? styles.pressed : null,
+        ]}
       >
-        <View>
-          <Text
-            style={
-              styles.activityNumber
-            }
-          >
-            {summary.activity
-              .transaction_count_this_month}
-          </Text>
-
-          <Text
-            style={
-              styles.activityLabel
-            }
-          >
-            ledger entries this month
+        <View style={styles.coachIcon}>
+          <Ionicons
+            name="sparkles-outline"
+            size={21}
+            color={colors.primary}
+          />
+        </View>
+        <View style={styles.coachCopy}>
+          <Text style={styles.coachEyebrow}>COACH</Text>
+          <Text style={styles.coachTitle}>Want help making sense of this month?</Text>
+          <Text style={styles.coachBody}>
+            Ask about spending, budgets, goals, or what changed.
           </Text>
         </View>
-
-        <View
-          style={
-            styles.activityRight
-          }
-        >
-          <Text
-            style={
-              styles.activitySmallLabel
-            }
-          >
-            Latest activity
-          </Text>
-
-          <Text
-            style={
-              styles.activityDate
-            }
-          >
-            {summary.activity
-              .last_transaction_date
-              ?? '—'}
-          </Text>
-        </View>
-      </View>
+        <Ionicons
+          name="arrow-forward"
+          size={19}
+          color={colors.primary}
+        />
+      </Pressable>
     </View>
   );
 }
 
+const styles = StyleSheet.create({
+  wrapper: {
+    gap: spacing.xl,
+    marginBottom: spacing.lg,
+  },
 
-const styles =
-  StyleSheet.create({
-    wrapper: {
-      gap: spacing.md,
-      marginBottom: spacing.lg,
-    },
+  overviewHeading: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
 
-    headingRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      gap: spacing.md,
-    },
+  monthLabel: {
+    color: colors.text,
+    fontSize: typography.subheading,
+    lineHeight: typography.lineHeightSubheading,
+    fontWeight: typography.weightSemibold,
+  },
 
-    eyebrow: {
-      color: colors.primary,
-      fontSize: typography.caption,
-      lineHeight: typography.lineHeightCaption,
-      fontWeight: typography.weightExtraBold,
-      letterSpacing: 1.1,
-    },
+  asOf: {
+    marginTop: 2,
+    color: colors.textTertiary,
+    fontSize: typography.caption,
+    lineHeight: typography.lineHeightCaption,
+  },
 
-    heading: {
-      marginTop: spacing.xxs,
-      color: colors.text,
-      fontSize: typography.heading,
-      lineHeight: typography.lineHeightHeading,
-      fontWeight: typography.weightExtraBold,
-      letterSpacing: -0.4,
-    },
+  cashFlowList: {
+    gap: spacing.md,
+  },
 
-    asOf: {
-      color: colors.textTertiary,
-      fontSize: typography.caption,
-      lineHeight: typography.lineHeightCaption,
-      textAlign: 'right',
-    },
+  cashFlowCard: {
+    padding: layout.cardPadding,
+    gap: spacing.lg,
+    borderRadius: radii.xl,
+    backgroundColor: colors.primary,
+    ...elevation.card,
+  },
 
-    quickActions: {
-      flexDirection: 'row',
-      gap: spacing.sm,
-    },
+  cashFlowTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
 
-    quickAction: {
-      flex: 1,
-      minHeight: layout.touchTarget + 2,
-    },
+  currencyCode: {
+    color: 'rgba(255,255,255,0.74)',
+    fontSize: typography.small,
+    lineHeight: typography.lineHeightSmall,
+    fontWeight: typography.weightSemibold,
+    letterSpacing: 0.7,
+  },
 
-    currencyList: {
-      gap: spacing.sm,
-    },
+  cashFlowCaption: {
+    marginTop: 2,
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: typography.caption,
+    lineHeight: typography.lineHeightCaption,
+  },
 
-    cashFlowCard: {
-      padding: spacing.lg,
-      borderRadius: radii.xl,
-      backgroundColor: colors.primary,
-      ...elevation.floating,
-    },
+  savingsPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.pill,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
 
-    cashFlowHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: spacing.md,
-    },
+  savingsPillText: {
+    color: colors.textOnPrimary,
+    fontSize: typography.caption,
+    fontWeight: typography.weightSemibold,
+  },
 
-    currencyCode: {
-      color: colors.textOnPrimary,
-      fontSize: typography.small,
-      lineHeight: typography.lineHeightSmall,
-      fontWeight: typography.weightExtraBold,
-      letterSpacing: 0.8,
-    },
+  netValue: {
+    color: colors.textOnPrimary,
+    fontSize: typography.display,
+    lineHeight: typography.lineHeightDisplay,
+    fontWeight: typography.weightBold,
+    letterSpacing: -1,
+    fontVariant: ['tabular-nums'],
+  },
 
-    savingsRate: {
-      color: colors.accentStrong,
-      fontSize: typography.caption,
-      lineHeight: typography.lineHeightCaption,
-      fontWeight: typography.weightSemibold,
-      textAlign: 'right',
-    },
+  netValueNegative: {
+    color: '#FFD9D5',
+  },
 
-    metrics: {
-      flexDirection: 'row',
-      marginTop: spacing.lg,
-      gap: spacing.md,
-    },
+  metricsRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.18)',
+  },
 
-    metric: {
-      flex: 1,
-      minWidth: 0,
-    },
+  metric: {
+    flex: 1,
+    gap: 3,
+  },
 
-    metricLabel: {
-      color: colors.accentStrong,
-      fontSize: typography.caption,
-      lineHeight: typography.lineHeightCaption,
-      fontWeight: typography.weightSemibold,
-    },
+  metricDivider: {
+    width: StyleSheet.hairlineWidth,
+    marginHorizontal: spacing.md,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
 
-    metricValue: {
-      marginTop: spacing.xxs,
-      color: colors.textOnPrimary,
-      fontSize: typography.body,
-      lineHeight: typography.lineHeightBody,
-      fontWeight: typography.weightBold,
-    },
+  metricLabel: {
+    color: 'rgba(255,255,255,0.68)',
+    fontSize: typography.caption,
+  },
 
-    positive: {
-      color: colors.accentStrong,
-    },
+  metricValue: {
+    color: colors.textOnPrimary,
+    fontSize: typography.body,
+    lineHeight: typography.lineHeightBody,
+    fontWeight: typography.weightSemibold,
+    fontVariant: ['tabular-nums'],
+  },
 
-    negative: {
-      color: colors.dangerSurface,
-    },
+  emptyHeroCard: {
+    padding: layout.cardPadding,
+    gap: spacing.md,
+    borderRadius: radii.xl,
+    backgroundColor: colors.surface,
+    ...elevation.card,
+  },
 
-    emptyCard: {
-      padding: spacing.lg,
-      borderRadius: radii.lg,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      ...elevation.card,
-    },
+  emptyHeroIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
+  },
 
-    emptyTitle: {
-      color: colors.text,
-      fontSize: typography.body,
-      lineHeight: typography.lineHeightBody,
-      fontWeight: typography.weightBold,
-    },
+  emptyHeroCopy: {
+    gap: spacing.xs,
+  },
 
-    emptyBody: {
-      marginTop: spacing.xs,
-      color: colors.textSecondary,
-      fontSize: typography.small,
-      lineHeight: typography.lineHeightSmall,
-    },
+  emptyHeroTitle: {
+    color: colors.text,
+    fontSize: typography.subheading,
+    lineHeight: typography.lineHeightSubheading,
+    fontWeight: typography.weightSemibold,
+  },
 
-    balanceCard: {
-      padding: spacing.lg,
-      borderRadius: radii.lg,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      ...elevation.card,
-    },
+  emptyHeroBody: {
+    color: colors.textSecondary,
+    fontSize: typography.small,
+    lineHeight: typography.lineHeightSmall,
+  },
 
-    sectionEyebrow: {
-      marginBottom: spacing.sm,
-      color: colors.textTertiary,
-      fontSize: typography.caption,
-      lineHeight: typography.lineHeightCaption,
-      fontWeight: typography.weightExtraBold,
-      letterSpacing: 0.9,
-    },
+  attentionSection: {
+    gap: spacing.sm,
+  },
 
-    balanceRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: spacing.md,
-      paddingVertical: spacing.sm,
-    },
+  sectionHeader: {
+    minHeight: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
 
-    balanceCurrency: {
-      color: colors.text,
-      fontSize: typography.small,
-      lineHeight: typography.lineHeightSmall,
-      fontWeight: typography.weightBold,
-    },
+  sectionTitle: {
+    color: colors.text,
+    fontSize: typography.subheading,
+    lineHeight: typography.lineHeightSubheading,
+    fontWeight: typography.weightSemibold,
+  },
 
-    balanceMeta: {
-      marginTop: spacing.xxs,
-      color: colors.textTertiary,
-      fontSize: typography.caption,
-      lineHeight: typography.lineHeightCaption,
-    },
+  sectionAction: {
+    color: colors.primary,
+    fontSize: typography.small,
+    lineHeight: typography.lineHeightSmall,
+    fontWeight: typography.weightSemibold,
+  },
 
-    balanceValue: {
-      color: colors.text,
-      fontSize: typography.subheading,
-      lineHeight: typography.lineHeightSubheading,
-      fontWeight: typography.weightExtraBold,
-      textAlign: 'right',
-    },
+  attentionCard: {
+    minHeight: 82,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: layout.cardPadding,
+    borderRadius: radii.lg,
+    backgroundColor: colors.warningSurface,
+  },
 
-    currencyNote: {
-      marginTop: spacing.sm,
-      color: colors.textTertiary,
-      fontSize: typography.caption,
-      lineHeight: typography.lineHeightCaption,
-    },
+  attentionIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
 
-    signalGrid: {
-      flexDirection: 'row',
-      gap: spacing.sm,
-    },
+  attentionCopy: {
+    flex: 1,
+    gap: 2,
+  },
 
-    signalCard: {
-      flex: 1,
-      minHeight: 126,
-      padding: spacing.md,
-      borderRadius: radii.lg,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      ...elevation.card,
-    },
+  attentionTitle: {
+    color: colors.text,
+    fontSize: typography.body,
+    lineHeight: typography.lineHeightBody,
+    fontWeight: typography.weightSemibold,
+  },
 
-    signalCardPressed: {
-      backgroundColor: colors.surfaceMuted,
-      borderColor: colors.borderStrong,
-    },
+  attentionBody: {
+    color: colors.warning,
+    fontSize: typography.small,
+    lineHeight: typography.lineHeightSmall,
+  },
 
-    signalLabel: {
-      color: colors.textSecondary,
-      fontSize: typography.caption,
-      lineHeight: typography.lineHeightCaption,
-      fontWeight: typography.weightBold,
-    },
+  accountsSection: {
+    gap: spacing.sm,
+  },
 
-    signalNumber: {
-      marginTop: spacing.sm,
-      color: colors.primary,
-      fontSize: 28,
-      lineHeight: 34,
-      fontWeight: typography.weightExtraBold,
-      letterSpacing: -0.5,
-    },
+  balanceCard: {
+    overflow: 'hidden',
+    borderRadius: radii.lg,
+    backgroundColor: colors.surface,
+    ...elevation.card,
+  },
 
-    warning: {
-      color: colors.warning,
-    },
+  balanceRow: {
+    minHeight: 76,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingHorizontal: layout.cardPadding,
+    paddingVertical: spacing.md,
+  },
 
-    signalBody: {
-      marginTop: spacing.xxs,
-      color: colors.textTertiary,
-      fontSize: typography.caption,
-      lineHeight: typography.lineHeightCaption,
-    },
+  balanceCopy: {
+    flex: 1,
+  },
 
-    activityStrip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: spacing.md,
-      padding: spacing.md,
-      borderRadius: radii.lg,
-      backgroundColor: colors.primarySoft,
-      borderWidth: 1,
-      borderColor: colors.accentStrong,
-    },
+  balanceCurrency: {
+    color: colors.text,
+    fontSize: typography.body,
+    lineHeight: typography.lineHeightBody,
+    fontWeight: typography.weightSemibold,
+  },
 
-    activityNumber: {
-      color: colors.primary,
-      fontSize: typography.heading,
-      lineHeight: typography.lineHeightHeading,
-      fontWeight: typography.weightExtraBold,
-    },
+  balanceMeta: {
+    color: colors.textSecondary,
+    fontSize: typography.caption,
+    lineHeight: typography.lineHeightCaption,
+  },
 
-    activityLabel: {
-      marginTop: spacing.xxs,
-      color: colors.textSecondary,
-      fontSize: typography.caption,
-      lineHeight: typography.lineHeightCaption,
-    },
+  balanceValue: {
+    maxWidth: '55%',
+    color: colors.text,
+    fontSize: typography.subheading,
+    lineHeight: typography.lineHeightSubheading,
+    fontWeight: typography.weightSemibold,
+    textAlign: 'right',
+    fontVariant: ['tabular-nums'],
+  },
 
-    activityRight: {
-      alignItems: 'flex-end',
-    },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: layout.cardPadding,
+    backgroundColor: colors.border,
+  },
 
-    activitySmallLabel: {
-      color: colors.textTertiary,
-      fontSize: typography.caption,
-      lineHeight: typography.lineHeightCaption,
-    },
+  balanceEmpty: {
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    padding: layout.cardPadding,
+  },
 
-    activityDate: {
-      marginTop: spacing.xxs,
-      color: colors.text,
-      fontSize: typography.small,
-      lineHeight: typography.lineHeightSmall,
-      fontWeight: typography.weightBold,
-    },
-  });
+  balanceEmptyTitle: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: typography.weightSemibold,
+  },
+
+  balanceEmptyBody: {
+    color: colors.textSecondary,
+    fontSize: typography.small,
+    lineHeight: typography.lineHeightSmall,
+  },
+
+  currencyNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+    paddingHorizontal: layout.cardPadding,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surfaceMuted,
+  },
+
+  currencyNoteText: {
+    flex: 1,
+    color: colors.textTertiary,
+    fontSize: typography.caption,
+    lineHeight: typography.lineHeightCaption,
+  },
+
+  coachCard: {
+    minHeight: 104,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: layout.cardPadding,
+    borderRadius: radii.lg,
+    backgroundColor: colors.primarySoft,
+  },
+
+  coachIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+
+  coachCopy: {
+    flex: 1,
+    gap: 2,
+  },
+
+  coachEyebrow: {
+    color: colors.primary,
+    fontSize: typography.caption,
+    fontWeight: typography.weightSemibold,
+    letterSpacing: 0.7,
+  },
+
+  coachTitle: {
+    color: colors.text,
+    fontSize: typography.body,
+    lineHeight: typography.lineHeightBody,
+    fontWeight: typography.weightSemibold,
+  },
+
+  coachBody: {
+    color: colors.textSecondary,
+    fontSize: typography.small,
+    lineHeight: typography.lineHeightSmall,
+  },
+
+  pressed: {
+    opacity: 0.72,
+  },
+});

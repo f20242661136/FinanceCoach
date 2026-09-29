@@ -1,10 +1,12 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import {
   useEffect,
   useMemo,
   useState,
 } from 'react';
-
 import {
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,28 +14,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
-import {
-  useRouter,
-} from 'expo-router';
-
-import {
-  useCreateOfflineTransaction,
-} from '../../offline/sync/use-create-offline-transaction';
-
-import {
-  useLocalTransactionOptions,
-} from '../../offline/sync/use-local-transaction-options';
-
-import {
-  AppButton,
-} from '@/components/ui/app-button';
-import {
-  AppCard,
-} from '@/components/ui/app-card';
-import {
-  InlineNotice,
-} from '@/components/ui/inline-notice';
+import { AppButton } from '@/components/ui/app-button';
+import { InlineNotice } from '@/components/ui/inline-notice';
 import {
   colors,
   elevation,
@@ -42,899 +27,720 @@ import {
   spacing,
   typography,
 } from '@/design/tokens';
+import { toUserFacingError } from '@/lib/user-facing-error';
+import { useCreateOfflineTransaction } from '../../offline/sync/use-create-offline-transaction';
+import { useLocalTransactionOptions } from '../../offline/sync/use-local-transaction-options';
 
-
-type TransactionType =
-  | 'expense'
-  | 'income';
-
+type TransactionType = 'expense' | 'income';
 
 function localToday(): string {
-  const date =
-    new Date();
-
-  const year =
-    date.getFullYear();
-
-  const month =
-    String(
-      date.getMonth() + 1,
-    ).padStart(
-      2,
-      '0',
-    );
-
-  const day =
-    String(
-      date.getDate(),
-    ).padStart(
-      2,
-      '0',
-    );
-
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 
-
 export function OfflineQuickAddScreen() {
-  const router =
-    useRouter();
+  const router = useRouter();
+  const [type, setType] = useState<TransactionType>('expense');
+  const [accountId, setAccountId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [transactionDate, setTransactionDate] = useState(localToday());
+  const [merchant, setMerchant] = useState('');
+  const [notes, setNotes] = useState('');
+  const [showMore, setShowMore] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const [
-    type,
-    setType,
-  ] =
-    useState<TransactionType>(
-      'expense',
-    );
-
-  const [
-    accountId,
-    setAccountId,
-  ] =
-    useState('');
-
-  const [
-    categoryId,
-    setCategoryId,
-  ] =
-    useState('');
-
-  const [
-    amount,
-    setAmount,
-  ] =
-    useState('');
-
-  const [
-    transactionDate,
-    setTransactionDate,
-  ] =
-    useState(
-      localToday(),
-    );
-
-  const [
-    merchant,
-    setMerchant,
-  ] =
-    useState('');
-
-  const [
-    notes,
-    setNotes,
-  ] =
-    useState('');
-
-  const [
-    errorMessage,
-    setErrorMessage,
-  ] =
-    useState<string | null>(
-      null,
-    );
-
-
-  const options =
-    useLocalTransactionOptions(
-      type,
-    );
-
-  const createMutation =
-    useCreateOfflineTransaction();
-
+  const options = useLocalTransactionOptions(type);
+  const createMutation = useCreateOfflineTransaction();
 
   const accounts = useMemo(
-    () => options.data
-      ?.accounts ?? [],
-    [options.data
-      ?.accounts],
+    () => options.data?.accounts ?? [],
+    [options.data?.accounts],
   );
-
   const categories = useMemo(
-    () => options.data
-      ?.categories ?? [],
-    [options.data
-      ?.categories],
+    () => options.data?.categories ?? [],
+    [options.data?.categories],
   );
-
 
   useEffect(() => {
     if (
       accounts.length > 0
-      && !accounts.some(
-        (account) =>
-          account.id ===
-          accountId,
-      )
+      && !accounts.some(account => account.id === accountId)
     ) {
-      // Encrypted local account data intentionally seeds the editable form once available.
+      // Preserve the existing safe default: seed the form with an active account.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setAccountId(
-        accounts[0].id,
-      );
+      setAccountId(accounts[0].id);
     }
-  }, [
-    accountId,
-    accounts,
-  ]);
+  }, [accountId, accounts]);
 
+  const selectedAccount = useMemo(
+    () => accounts.find(account => account.id === accountId) ?? null,
+    [accountId, accounts],
+  );
 
-  useEffect(() => {
-    if (
-      categories.length > 0
-      && !categories.some(
-        (category) =>
-          category.id ===
-          categoryId,
-      )
-    ) {
-      // Encrypted local category data intentionally seeds the editable form once available.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setCategoryId(
-        categories[0].id,
-      );
-    }
-  }, [
-    categories,
-    categoryId,
-  ]);
-
-
-  const selectedAccount =
-    useMemo(
-      () =>
-        accounts.find(
-          (account) =>
-            account.id ===
-            accountId,
-        )
-        ?? null,
-      [
-        accountId,
-        accounts,
-      ],
-    );
-
+  const canSave = Boolean(
+    accountId
+    && amount.trim()
+    && transactionDate.trim(),
+  ) && !createMutation.isPending;
 
   async function save() {
-    setErrorMessage(
-      null,
-    );
+    setErrorMessage(null);
 
     try {
-      await createMutation
-        .mutateAsync({
-          accountId,
-
-          categoryId:
-            categoryId
-              || null,
-
-          type,
-
-          amount,
-
-          transactionDate,
-
-          merchant,
-
-          notes,
-        });
+      await createMutation.mutateAsync({
+        accountId,
+        categoryId: categoryId || null,
+        type,
+        amount,
+        transactionDate,
+        merchant,
+        notes,
+      });
 
       router.back();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'Could not save the transaction.',
+        toUserFacingError(error, 'transaction'),
       );
     }
   }
 
-
-  const canSave =
-    Boolean(
-      accountId
-      && amount.trim()
-      && transactionDate.trim(),
-    )
-    && !createMutation.isPending;
-
-
   return (
-    <ScrollView
-      style={
-        styles.screen
-      }
-      contentContainerStyle={
-        styles.content
-      }
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="on-drag"
-      nestedScrollEnabled
-    >
-      <Text
-        style={
-          styles.eyebrow
-        }
+    <SafeAreaView edges={['bottom']} style={styles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.flex}
       >
-        QUICK ADD
-      </Text>
+        <View style={styles.screen}>
+          <ScrollView
+            style={styles.flex}
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.header}>
+              <View style={styles.headerRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Close transaction form"
+                  hitSlop={8}
+                  onPress={() => router.back()}
+                  style={({ pressed }) => [
+                    styles.iconButton,
+                    pressed ? styles.iconButtonPressed : null,
+                  ]}
+                >
+                  <Ionicons name="close" size={22} color={colors.text} />
+                </Pressable>
 
-      <Text
-        style={
-          styles.title
-        }
-      >
-        Add a transaction
-      </Text>
+                <Text accessibilityRole="header" style={styles.title}>
+                  Add transaction
+                </Text>
 
-      <Text
-        style={
-          styles.subtitle
-        }
-      >
-        Saved securely on this device first, then synced to your ledger when connected.
-      </Text>
+                <View style={styles.iconButtonPlaceholder} />
+              </View>
 
+              <Text style={styles.subtitle}>
+                Capture the essentials now. Extra details stay out of the way until you need them.
+              </Text>
+            </View>
 
-      <View
-        style={
-          styles.segment
-        }
-      >
-        {(
-          [
-            'expense',
-            'income',
-          ] as const
-        ).map(
-          (value) => {
-            const selected =
-              value === type;
+            <View style={styles.segment}>
+              {(['expense', 'income'] as const).map(value => {
+                const selected = value === type;
+                return (
+                  <Pressable
+                    key={value}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={() => {
+                      setType(value);
+                      setCategoryId('');
+                    }}
+                    style={({ pressed }) => [
+                      styles.segmentButton,
+                      selected ? styles.segmentButtonSelected : null,
+                      pressed ? styles.pressed : null,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.segmentText,
+                        selected ? styles.segmentTextSelected : null,
+                      ]}
+                    >
+                      {value === 'expense' ? 'Expense' : 'Income'}
+                    </Text>
+                  </Pressable>
+                );
+              })}
 
-            return (
               <Pressable
-                key={
-                  value
-                }
                 accessibilityRole="button"
-                accessibilityState={{
-                  selected,
-                }}
-                onPress={() => {
-                  setType(
-                    value,
-                  );
-
-                  setCategoryId(
-                    '',
-                  );
-                }}
-                style={[
+                accessibilityLabel="Transfer between accounts"
+                onPress={() => router.replace('/transfer' as never)}
+                style={({ pressed }) => [
                   styles.segmentButton,
-
-                  selected
-                    ? styles.segmentButtonSelected
-                    : null,
+                  pressed ? styles.pressed : null,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.segmentText,
-
-                    selected
-                      ? styles.segmentTextSelected
-                      : null,
-                  ]}
-                >
-                  {value === 'expense'
-                    ? 'Expense'
-                    : 'Income'}
-                </Text>
+                <Text style={styles.segmentText}>Transfer</Text>
               </Pressable>
-            );
-          },
-        )}
-      </View>
+            </View>
 
+            <View style={styles.amountCard}>
+              <Text style={styles.amountLabel}>Amount</Text>
+              <View style={styles.amountRow}>
+                <Text style={styles.currencyCode}>
+                  {selectedAccount?.currency_code ?? '---'}
+                </Text>
+                <TextInput
+                  accessibilityLabel="Amount"
+                  autoFocus
+                  value={amount}
+                  onChangeText={setAmount}
+                  placeholder="0.00"
+                  placeholderTextColor={colors.textTertiary}
+                  selectionColor={colors.focus}
+                  keyboardType="decimal-pad"
+                  style={styles.amountInput}
+                />
+              </View>
+            </View>
 
-      <Text
-        style={
-          styles.label
-        }
-      >
-        Amount
-      </Text>
+            {options.error ? (
+              <InlineNotice
+                tone="error"
+                message={toUserFacingError(options.error, 'transaction')}
+              />
+            ) : null}
 
-      <View
-        style={
-          styles.amountWrap
-        }
-      >
-        <Text
-          style={
-            styles.currency
-          }
-        >
-          {selectedAccount
-            ?.currency_code
-            ?? '—'}
-        </Text>
+            {accounts.length === 0 && !options.isLoading ? (
+              <View style={styles.emptyAccountCard}>
+                <View style={styles.smallIcon}>
+                  <Ionicons
+                    name="wallet-outline"
+                    size={21}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={styles.emptyAccountCopy}>
+                  <Text style={styles.emptyAccountTitle}>Add an account first</Text>
+                  <Text style={styles.emptyAccountBody}>
+                    Transactions need an account so balances stay correct.
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Add account"
+                  onPress={() => router.push('/add-account' as never)}
+                  style={({ pressed }) => pressed ? styles.pressed : null}
+                >
+                  <Text style={styles.textAction}>Add</Text>
+                </Pressable>
+              </View>
+            ) : null}
 
-        <TextInput
-          accessibilityLabel="Amount"
-          value={
-            amount
-          }
-          onChangeText={
-            setAmount
-          }
-          placeholder="0.00"
-          placeholderTextColor={
-            colors.textTertiary
-          }
-          selectionColor={
-            colors.focus
-          }
-          keyboardType="decimal-pad"
-          style={
-            styles.amountInput
-          }
-        />
-      </View>
+            {accounts.length > 0 ? (
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Account</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.chipRow}
+                >
+                  {accounts.map(account => {
+                    const selected = account.id === accountId;
+                    return (
+                      <Pressable
+                        key={account.id}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        onPress={() => setAccountId(account.id)}
+                        style={({ pressed }) => [
+                          styles.chip,
+                          selected ? styles.chipSelected : null,
+                          pressed ? styles.pressed : null,
+                        ]}
+                      >
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            styles.chipText,
+                            selected ? styles.chipTextSelected : null,
+                          ]}
+                        >
+                          {account.name} · {account.currency_code}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            ) : null}
 
+            {categories.length > 0 ? (
+              <View style={styles.fieldGroup}>
+                <View style={styles.fieldHeadingRow}>
+                  <Text style={styles.fieldLabel}>Category</Text>
+                  {categoryId ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Clear category"
+                      hitSlop={8}
+                      onPress={() => setCategoryId('')}
+                    >
+                      <Text style={styles.clearAction}>Clear</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
 
-      <Text
-        style={
-          styles.label
-        }
-      >
-        Account
-      </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.chipRow}
+                >
+                  {categories.map(category => {
+                    const selected = category.id === categoryId;
+                    return (
+                      <Pressable
+                        key={category.id}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        onPress={() => setCategoryId(category.id)}
+                        style={({ pressed }) => [
+                          styles.chip,
+                          selected ? styles.chipSelected : null,
+                          pressed ? styles.pressed : null,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            selected ? styles.chipTextSelected : null,
+                          ]}
+                        >
+                          {category.default_name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            ) : null}
 
-      <View
-        style={
-          styles.chips
-        }
-      >
-        {accounts.map(
-          (account) => {
-            const selected =
-              account.id ===
-              accountId;
-
-            return (
-              <Pressable
-                key={
-                  account.id
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>
+                {type === 'expense' ? 'Merchant' : 'Source'}
+              </Text>
+              <TextInput
+                accessibilityLabel={
+                  type === 'expense' ? 'Merchant' : 'Income source'
                 }
-                onPress={() => {
-                  setAccountId(
-                    account.id,
-                  );
-                }}
-                style={[
-                  styles.chip,
-
-                  selected
-                    ? styles.chipSelected
-                    : null,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-
-                    selected
-                      ? styles.chipTextSelected
-                      : null,
-                  ]}
-                >
-                  {account.name}
-                  {' · '}
-                  {account.currency_code}
-                </Text>
-              </Pressable>
-            );
-          },
-        )}
-      </View>
-
-
-      <Text
-        style={
-          styles.label
-        }
-      >
-        Category
-      </Text>
-
-      <View
-        style={
-          styles.chips
-        }
-      >
-        {categories.map(
-          (category) => {
-            const selected =
-              category.id ===
-              categoryId;
-
-            return (
-              <Pressable
-                key={
-                  category.id
+                value={merchant}
+                onChangeText={setMerchant}
+                placeholder={
+                  type === 'expense'
+                    ? 'Where did you spend?'
+                    : 'Where did it come from?'
                 }
-                onPress={() => {
-                  setCategoryId(
-                    category.id,
-                  );
-                }}
-                style={[
-                  styles.chip,
+                placeholderTextColor={colors.textTertiary}
+                selectionColor={colors.focus}
+                style={styles.input}
+              />
+            </View>
 
-                  selected
-                    ? styles.chipSelected
-                    : null,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showMore }}
+              onPress={() => setShowMore(value => !value)}
+              style={({ pressed }) => [
+                styles.moreButton,
+                pressed ? styles.pressed : null,
+              ]}
+            >
+              <Text style={styles.moreButtonText}>
+                {showMore ? 'Hide details' : 'More details'}
+              </Text>
+              <Ionicons
+                name={showMore ? 'chevron-up' : 'chevron-down'}
+                size={18}
+                color={colors.primary}
+              />
+            </Pressable>
 
-                    selected
-                      ? styles.chipTextSelected
-                      : null,
-                  ]}
-                >
-                  {category.default_name}
-                </Text>
-              </Pressable>
-            );
-          },
-        )}
-      </View>
+            {showMore ? (
+              <View style={styles.detailsCard}>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Date</Text>
+                  <TextInput
+                    accessibilityLabel="Transaction date"
+                    value={transactionDate}
+                    onChangeText={setTransactionDate}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={colors.textTertiary}
+                    autoCapitalize="none"
+                    selectionColor={colors.focus}
+                    style={styles.input}
+                  />
+                </View>
 
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Note</Text>
+                  <TextInput
+                    accessibilityLabel="Transaction note"
+                    value={notes}
+                    onChangeText={setNotes}
+                    placeholder="Optional"
+                    placeholderTextColor={colors.textTertiary}
+                    selectionColor={colors.focus}
+                    multiline
+                    style={[styles.input, styles.notes]}
+                  />
+                </View>
+              </View>
+            ) : null}
 
-      <Text
-        style={
-          styles.label
-        }
-      >
-        Date
-      </Text>
+            {errorMessage ? (
+              <InlineNotice tone="error" message={errorMessage} />
+            ) : null}
 
-      <TextInput
-        value={
-          transactionDate
-        }
-        onChangeText={
-          setTransactionDate
-        }
-        placeholder="YYYY-MM-DD"
-        autoCapitalize="none"
-        style={
-          styles.input
-        }
-      />
+            <View style={styles.syncNote}>
+              <Ionicons
+                name="cloud-done-outline"
+                size={17}
+                color={colors.textTertiary}
+              />
+              <Text style={styles.syncNoteText}>
+                Saves securely on this device first and syncs when available.
+              </Text>
+            </View>
+          </ScrollView>
 
-
-      <Text
-        style={
-          styles.label
-        }
-      >
-        Merchant / source
-      </Text>
-
-      <TextInput
-        value={
-          merchant
-        }
-        onChangeText={
-          setMerchant
-        }
-        placeholder={
-          type === 'expense'
-            ? 'Where did you spend?'
-            : 'Where did it come from?'
-        }
-        style={
-          styles.input
-        }
-      />
-
-
-      <Text
-        style={
-          styles.label
-        }
-      >
-        Note
-      </Text>
-
-      <TextInput
-        value={
-          notes
-        }
-        onChangeText={
-          setNotes
-        }
-        placeholder="Optional"
-        multiline
-        style={[
-          styles.input,
-          styles.notes,
-        ]}
-      />
-
-
-      {errorMessage ? (
-        <InlineNotice
-          tone="error"
-          message={errorMessage}
-        />
-      ) : null}
-
-
-      <AppCard
-        tone="muted"
-        style={
-          styles.offlineNote
-        }
-      >
-        <Text
-          style={
-            styles.offlineNoteTitle
-          }
-        >
-          Offline-ready
-        </Text>
-
-        <Text
-          style={
-            styles.offlineNoteBody
-          }
-        >
-          If the server is unavailable, this entry stays encrypted on this device and syncs later. Account balances remain server-confirmed until sync completes.
-        </Text>
-      </AppCard>
-
-
-      <AppButton
-        label={
-          createMutation.isPending
-            ? 'Saving...'
-            : `Save ${type === 'expense' ? 'expense' : 'income'}`
-        }
-        loading={
-          createMutation.isPending
-        }
-        disabled={
-          !canSave
-        }
-        icon={
-          type === 'expense'
-            ? 'arrow-up-outline'
-            : 'arrow-down-outline'
-        }
-        onPress={() => {
-          void save();
-        }}
-        style={
-          styles.saveButton
-        }
-      />
-    </ScrollView>
+          <View style={styles.actionFooter}>
+            <AppButton
+              label={
+                createMutation.isPending
+                  ? 'Saving...'
+                  : type === 'expense'
+                    ? 'Add expense'
+                    : 'Add income'
+              }
+              loading={createMutation.isPending}
+              disabled={!canSave}
+              icon="checkmark"
+              onPress={() => void save()}
+            />
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
 
-const styles =
-  StyleSheet.create({
-    screen: {
-      flex: 1,
-      backgroundColor:
-        colors.background,
-    },
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
 
-    content: {
-      flexGrow: 1,
-      width: '100%',
-      maxWidth:
-        layout.contentMaxWidth,
-      alignSelf: 'center',
-      paddingHorizontal:
-        layout.screenHorizontalPadding,
-      paddingTop:
-        spacing.lg,
-      paddingBottom: 120,
-    },
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
 
-    eyebrow: {
-      color:
-        colors.primary,
-      fontSize:
-        typography.caption,
-      lineHeight:
-        typography.lineHeightCaption,
-      fontWeight:
-        typography.weightBold,
-      letterSpacing: 1.25,
-    },
+  content: {
+    flexGrow: 1,
+    width: '100%',
+    maxWidth: layout.contentMaxWidth,
+    alignSelf: 'center',
+    paddingHorizontal: layout.screenHorizontalPadding,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
+    gap: spacing.lg,
+  },
 
-    title: {
-      marginTop:
-        spacing.sm,
-      color:
-        colors.text,
-      fontSize:
-        typography.heading,
-      lineHeight:
-        typography.lineHeightHeading,
-      fontWeight:
-        typography.weightExtraBold,
-      letterSpacing: -0.4,
-    },
+  header: {
+    gap: spacing.sm,
+  },
 
-    subtitle: {
-      marginTop:
-        spacing.sm,
-      marginBottom:
-        spacing.lg,
-      color:
-        colors.textSecondary,
-      fontSize:
-        typography.small,
-      lineHeight:
-        typography.lineHeightSmall,
-    },
+  headerRow: {
+    minHeight: layout.touchTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
 
-    segment: {
-      flexDirection: 'row',
-      padding:
-        spacing.xxs,
-      borderRadius:
-        radii.md,
-      backgroundColor:
-        colors.surfaceMuted,
-      marginBottom:
-        spacing.lg,
-    },
+  iconButton: {
+    width: layout.touchTarget,
+    height: layout.touchTarget,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
-    segmentButton: {
-      flex: 1,
-      minHeight:
-        layout.touchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius:
-        radii.sm,
-    },
+  iconButtonPlaceholder: {
+    width: layout.touchTarget,
+    height: layout.touchTarget,
+  },
 
-    segmentButtonSelected: {
-      backgroundColor:
-        colors.surface,
-      ...elevation.card,
-    },
+  iconButtonPressed: {
+    backgroundColor: colors.surfaceMuted,
+  },
 
-    segmentText: {
-      color:
-        colors.textSecondary,
-      fontSize:
-        typography.small,
-      fontWeight:
-        typography.weightBold,
-    },
+  title: {
+    flex: 1,
+    color: colors.text,
+    fontSize: typography.heading,
+    lineHeight: typography.lineHeightHeading,
+    fontWeight: typography.weightBold,
+    textAlign: 'center',
+    letterSpacing: -0.4,
+  },
 
-    segmentTextSelected: {
-      color:
-        colors.primary,
-    },
+  subtitle: {
+    alignSelf: 'center',
+    maxWidth: 440,
+    color: colors.textSecondary,
+    fontSize: typography.small,
+    lineHeight: typography.lineHeightSmall,
+    textAlign: 'center',
+  },
 
-    label: {
-      color:
-        colors.text,
-      fontSize:
-        typography.small,
-      lineHeight:
-        typography.lineHeightSmall,
-      fontWeight:
-        typography.weightBold,
-      marginBottom:
-        spacing.xs,
-      marginTop:
-        spacing.md,
-    },
+  segment: {
+    flexDirection: 'row',
+    padding: spacing.xxs,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceMuted,
+  },
 
-    amountWrap: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      minHeight: 72,
-      paddingHorizontal:
-        spacing.md,
-      borderRadius:
-        radii.lg,
-      borderWidth: 1,
-      borderColor:
-        colors.borderStrong,
-      backgroundColor:
-        colors.surface,
-      ...elevation.card,
-    },
+  segmentButton: {
+    flex: 1,
+    minHeight: layout.touchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radii.sm,
+  },
 
-    currency: {
-      color:
-        colors.textSecondary,
-      fontSize:
-        typography.small,
-      fontWeight:
-        typography.weightBold,
-      marginRight:
-        spacing.sm,
-    },
+  segmentButtonSelected: {
+    backgroundColor: colors.surface,
+    ...elevation.card,
+  },
 
-    amountInput: {
-      flex: 1,
-      minHeight: 64,
-      color:
-        colors.text,
-      fontSize: 28,
-      lineHeight: 34,
-      fontWeight:
-        typography.weightExtraBold,
-      letterSpacing: -0.5,
-    },
+  segmentText: {
+    color: colors.textSecondary,
+    fontSize: typography.small,
+    lineHeight: typography.lineHeightSmall,
+    fontWeight: typography.weightSemibold,
+  },
 
-    input: {
-      minHeight: 54,
-      borderRadius:
-        radii.md,
-      borderWidth: 1,
-      borderColor:
-        colors.border,
-      backgroundColor:
-        colors.surface,
-      color:
-        colors.text,
-      paddingHorizontal:
-        spacing.md,
-      fontSize:
-        typography.body,
-    },
+  segmentTextSelected: {
+    color: colors.primary,
+  },
 
-    notes: {
-      minHeight: 104,
-      paddingTop:
-        spacing.md,
-      textAlignVertical: 'top',
-    },
+  amountCard: {
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.lg,
+  },
 
-    chips: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap:
-        spacing.sm,
-    },
+  amountLabel: {
+    color: colors.textSecondary,
+    fontSize: typography.small,
+    lineHeight: typography.lineHeightSmall,
+    fontWeight: typography.weightMedium,
+  },
 
-    chip: {
-      minHeight:
-        layout.touchTarget,
-      justifyContent: 'center',
-      paddingHorizontal:
-        spacing.md,
-      paddingVertical:
-        spacing.sm,
-      borderRadius:
-        radii.pill,
-      borderWidth: 1,
-      borderColor:
-        colors.border,
-      backgroundColor:
-        colors.surface,
-    },
+  amountRow: {
+    maxWidth: '100%',
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
 
-    chipSelected: {
-      borderColor:
-        colors.primary,
-      backgroundColor:
-        colors.primarySoft,
-    },
+  currencyCode: {
+    color: colors.textSecondary,
+    fontSize: typography.subheading,
+    fontWeight: typography.weightSemibold,
+  },
 
-    chipText: {
-      color:
-        colors.textSecondary,
-      fontSize:
-        typography.small,
-      fontWeight:
-        typography.weightSemibold,
-    },
+  amountInput: {
+    minWidth: 130,
+    maxWidth: '75%',
+    padding: 0,
+    color: colors.text,
+    fontSize: 42,
+    lineHeight: 50,
+    fontWeight: typography.weightBold,
+    letterSpacing: -1.2,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
+  },
 
-    chipTextSelected: {
-      color:
-        colors.primary,
-      fontWeight:
-        typography.weightBold,
-    },
+  fieldGroup: {
+    gap: spacing.xs,
+  },
 
-    error: {
-      marginTop:
-        spacing.lg,
-    },
+  fieldHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
 
-    errorText: {
-      color:
-        colors.danger,
-      fontSize:
-        typography.small,
-      lineHeight:
-        typography.lineHeightSmall,
-    },
+  fieldLabel: {
+    color: colors.text,
+    fontSize: typography.small,
+    lineHeight: typography.lineHeightSmall,
+    fontWeight: typography.weightSemibold,
+  },
 
-    offlineNote: {
-      marginTop:
-        spacing.lg,
-      gap:
-        spacing.xs,
-    },
+  chipRow: {
+    gap: spacing.xs,
+    paddingRight: layout.screenHorizontalPadding,
+  },
 
-    offlineNoteTitle: {
-      color:
-        colors.primary,
-      fontSize:
-        typography.small,
-      lineHeight:
-        typography.lineHeightSmall,
-      fontWeight:
-        typography.weightBold,
-    },
+  chip: {
+    minHeight: 42,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
+  },
 
-    offlineNoteBody: {
-      color:
-        colors.textSecondary,
-      fontSize:
-        typography.caption,
-      lineHeight:
-        typography.lineHeightCaption,
-    },
+  chipSelected: {
+    backgroundColor: colors.primarySoft,
+  },
 
-    saveButton: {
-      marginTop:
-        spacing.lg,
-    },
+  chipText: {
+    color: colors.textSecondary,
+    fontSize: typography.small,
+    fontWeight: typography.weightMedium,
+  },
 
-    saveButtonDisabled: {
-      opacity: 0.45,
-    },
+  chipTextSelected: {
+    color: colors.primary,
+    fontWeight: typography.weightSemibold,
+  },
 
-    saveButtonText: {
-      color:
-        colors.textOnPrimary,
-      fontSize:
-        typography.body,
-      fontWeight:
-        typography.weightBold,
-    },
-  });
+  clearAction: {
+    color: colors.primary,
+    fontSize: typography.caption,
+    fontWeight: typography.weightSemibold,
+  },
+
+  input: {
+    minHeight: 52,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.sm,
+    backgroundColor: colors.surface,
+    color: colors.text,
+    fontSize: typography.body,
+    lineHeight: typography.lineHeightBody,
+  },
+
+  notes: {
+    minHeight: 96,
+    textAlignVertical: 'top',
+  },
+
+  moreButton: {
+    minHeight: layout.touchTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
+
+  moreButtonText: {
+    color: colors.primary,
+    fontSize: typography.small,
+    fontWeight: typography.weightSemibold,
+  },
+
+  detailsCard: {
+    gap: spacing.md,
+    padding: layout.cardPadding,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surfaceMuted,
+  },
+
+  emptyAccountCard: {
+    minHeight: 80,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: layout.cardPadding,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surface,
+    ...elevation.card,
+  },
+
+  smallIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
+  },
+
+  emptyAccountCopy: {
+    flex: 1,
+    gap: 2,
+  },
+
+  emptyAccountTitle: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: typography.weightSemibold,
+  },
+
+  emptyAccountBody: {
+    color: colors.textSecondary,
+    fontSize: typography.small,
+    lineHeight: typography.lineHeightSmall,
+  },
+
+  textAction: {
+    color: colors.primary,
+    fontSize: typography.small,
+    fontWeight: typography.weightSemibold,
+  },
+
+  syncNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+  },
+
+  syncNoteText: {
+    flex: 1,
+    color: colors.textTertiary,
+    fontSize: typography.caption,
+    lineHeight: typography.lineHeightCaption,
+  },
+
+  actionFooter: {
+    width: '100%',
+    maxWidth: layout.contentMaxWidth,
+    alignSelf: 'center',
+    paddingHorizontal: layout.screenHorizontalPadding,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    backgroundColor: colors.background,
+  },
+
+  pressed: {
+    opacity: 0.72,
+  },
+});

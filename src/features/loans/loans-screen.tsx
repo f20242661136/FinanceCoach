@@ -1,3 +1,5 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+
 import {
   Pressable,
   RefreshControl,
@@ -6,6 +8,18 @@ import {
   Text,
   View,
 } from 'react-native';
+
+import {
+  useRouter,
+} from 'expo-router';
+
+import {
+  AppButton,
+} from '@/components/ui/app-button';
+
+import {
+  StatePanel,
+} from '@/components/ui/state-panel';
 
 import {
   colors,
@@ -17,8 +31,8 @@ import {
 } from '@/design/tokens';
 
 import {
-  useRouter,
-} from 'expo-router';
+  toUserFacingError,
+} from '@/lib/user-facing-error';
 
 import {
   useLocalFinanceReferenceData,
@@ -37,6 +51,35 @@ import {
   useLoanStatus,
 } from './loan-query';
 
+function friendlyDueDate(
+  value: string | null,
+): string {
+  if (!value) {
+    return 'No due date';
+  }
+
+  const parsed =
+    new Date(
+      `${value}T00:00:00`,
+    );
+
+  if (
+    Number.isNaN(
+      parsed.getTime(),
+    )
+  ) {
+    return `Due ${value}`;
+  }
+
+  return `Due ${parsed.toLocaleDateString(
+    undefined,
+    {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    },
+  )}`;
+}
 
 export function LoansScreen() {
   const router =
@@ -51,6 +94,24 @@ export function LoansScreen() {
   const loans =
     query.data ?? [];
 
+  const activeCount =
+    loans.filter(
+      loan =>
+        loan.status !== 'settled',
+    ).length;
+
+  const overdueCount =
+    loans.filter(
+      loan =>
+        loan.is_overdue
+        && loan.status !== 'settled',
+    ).length;
+
+  const settledCount =
+    loans.filter(
+      loan =>
+        loan.status === 'settled',
+    ).length;
 
   function minorUnitFor(
     currencyCode: string,
@@ -59,24 +120,22 @@ export function LoansScreen() {
       reference.data
         ?.currencies
         .find(
-          (currency) =>
-            currency.code ===
-            currencyCode,
+          currency =>
+            currency.code
+            === currencyCode,
         )
         ?.minorUnit
       ?? 2
     );
   }
 
-
   return (
     <ScrollView
-      style={
-        styles.screen
-      }
+      style={styles.screen}
       contentContainerStyle={
         styles.content
       }
+      showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
           refreshing={
@@ -88,307 +147,311 @@ export function LoansScreen() {
         />
       }
     >
-      <View
-        style={
-          styles.headerRow
-        }
-      >
-        <View
-          style={
-            styles.headerCopy
-          }
-        >
-          <Text
-            style={
-              styles.eyebrow
-            }
-          >
-            LOANS
-          </Text>
-
-          <Text
-            style={
-              styles.title
-            }
-          >
-            Money borrowed and money given
-          </Text>
-
-          <Text
-            style={
-              styles.subtitle
-            }
-          >
-            Track principal, due dates and every payment with a separate history.
-          </Text>
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => {
-            router.push(
-              '/create-loan' as never,
-            );
-          }}
-          style={
-            styles.addButton
-          }
-        >
-          <Text
-            style={
-              styles.addButtonText
-            }
-          >
-            + Add
-          </Text>
-        </Pressable>
-      </View>
-
-
-      {query.isLoading ? (
-        <View
-          style={
-            styles.stateCard
-          }
-        >
-          <Text
-            style={
-              styles.stateText
-            }
-          >
-            Loading loans…
-          </Text>
-        </View>
-      ) : null}
-
-
-      {query.error ? (
-        <View
-          style={[
-            styles.stateCard,
-            styles.errorCard,
-          ]}
-        >
-          <Text
-            style={
-              styles.errorTitle
-            }
-          >
-            Couldn’t load loans
-          </Text>
-
-          <Text
-            style={
-              styles.stateText
-            }
-          >
-            {query.error instanceof Error
-              ? query.error.message
-              : 'Please try again.'}
-          </Text>
-
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              void query.refetch();
-            }}
-            style={
-              styles.retryButton
-            }
-          >
-            <Text
-              style={
-                styles.retryButtonText
-              }
-            >
-              Retry
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.eyebrow}>
+              LOANS
             </Text>
-          </Pressable>
-        </View>
-      ) : null}
 
+            <Text
+              accessibilityRole="header"
+              style={styles.title}
+            >
+              Money borrowed and given
+            </Text>
 
-      {!query.isLoading
-      && !query.error
-      && loans.length === 0 ? (
-        <View
-          style={
-            styles.emptyCard
-          }
-        >
-          <Text
-            style={
-              styles.emptyTitle
-            }
-          >
-            No loans yet
-          </Text>
-
-          <Text
-            style={
-              styles.emptyBody
-            }
-          >
-            Add money you borrowed or money you gave to someone so repayment stays clear.
-          </Text>
+            <Text style={styles.subtitle}>
+              Keep principal, repayments, interest, and due dates clear without mixing them into everyday spending.
+            </Text>
+          </View>
 
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Add loan"
             onPress={() => {
               router.push(
                 '/create-loan' as never,
               );
             }}
-            style={
-              styles.primaryButton
-            }
+            style={({ pressed }) => [
+              styles.addButton,
+              pressed
+                ? styles.addButtonPressed
+                : null,
+            ]}
           >
-            <Text
-              style={
-                styles.primaryButtonText
+            <Ionicons
+              name="add"
+              size={23}
+              color={
+                colors.textOnPrimary
               }
-            >
-              Add loan
-            </Text>
+            />
           </Pressable>
         </View>
-      ) : null}
 
+        {!query.isLoading
+        && !query.error
+        && loans.length > 0 ? (
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryItem}>
+              <Text
+                style={[
+                  styles.summaryValue,
+                  styles.summaryPrimary,
+                ]}
+              >
+                {activeCount}
+              </Text>
 
-      <View
-        style={
-          styles.list
-        }
-      >
-        {loans.map(
-          (loan) => {
-            const minorUnit =
-              minorUnitFor(
-                loan.currency_code,
-              );
+              <Text style={styles.summaryLabel}>
+                Active
+              </Text>
+            </View>
 
-            return (
-              <Pressable
-                key={
-                  loan.id
-                }
-                accessibilityRole="button"
-                onPress={() => {
-                  router.push({
-                    pathname:
-                      '/loan-detail' as never,
+            <View style={styles.summaryDivider} />
 
-                    params: {
-                      loanId:
-                        loan.id,
-                    },
-                  });
-                }}
-                style={({ pressed }) => [
-                  styles.card,
-
-                  loan.is_overdue
-                    ? styles.overdueCard
-                    : null,
-
-                  loan.status ===
-                    'settled'
-                    ? styles.settledCard
-                    : null,
-
-                  pressed
-                    ? styles.pressed
+            <View style={styles.summaryItem}>
+              <Text
+                style={[
+                  styles.summaryValue,
+                  overdueCount > 0
+                    ? styles.summaryWarning
                     : null,
                 ]}
               >
-                <View
-                  style={
-                    styles.cardHeader
-                  }
+                {overdueCount}
+              </Text>
+
+              <Text style={styles.summaryLabel}>
+                Overdue
+              </Text>
+            </View>
+
+            <View style={styles.summaryDivider} />
+
+            <View style={styles.summaryItem}>
+              <Text
+                style={[
+                  styles.summaryValue,
+                  styles.summarySuccess,
+                ]}
+              >
+                {settledCount}
+              </Text>
+
+              <Text style={styles.summaryLabel}>
+                Settled
+              </Text>
+            </View>
+          </View>
+        ) : null}
+      </View>
+
+      {query.isLoading ? (
+        <StatePanel
+          loading
+          title="Loading loans"
+          description="Checking your loan balances and repayment status."
+        />
+      ) : null}
+
+      {query.error ? (
+        <StatePanel
+          title="Loans unavailable"
+          description={
+            toUserFacingError(
+              query.error,
+              'loan',
+            )
+          }
+          icon="alert-circle-outline"
+          tone="danger"
+          action={
+            <AppButton
+              label="Try again"
+              variant="secondary"
+              fullWidth={false}
+              onPress={() => {
+                void query.refetch();
+              }}
+            />
+          }
+        />
+      ) : null}
+
+      {!query.isLoading
+      && !query.error
+      && loans.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <View style={styles.emptyIcon}>
+            <Ionicons
+              name="cash-outline"
+              size={28}
+              color={
+                colors.primary
+              }
+            />
+          </View>
+
+          <Text style={styles.emptyTitle}>
+            Keep loan repayments clear
+          </Text>
+
+          <Text style={styles.emptyBody}>
+            Add money you borrowed or money you gave to someone. Finance Coach will keep its repayment history separate.
+          </Text>
+
+          <AppButton
+            label="Add loan"
+            icon="add-outline"
+            onPress={() => {
+              router.push(
+                '/create-loan' as never,
+              );
+            }}
+          />
+        </View>
+      ) : null}
+
+      {!query.isLoading
+      && !query.error
+      && loans.length > 0 ? (
+        <View style={styles.list}>
+          {loans.map(
+            loan => {
+              const minorUnit =
+                minorUnitFor(
+                  loan.currency_code,
+                );
+
+              const settled =
+                loan.status
+                === 'settled';
+
+              const overdue =
+                loan.is_overdue
+                && !settled;
+
+              return (
+                <Pressable
+                  key={loan.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open loan with ${loan.counterparty_name}`}
+                  onPress={() => {
+                    router.push({
+                      pathname:
+                        '/loan-detail' as never,
+                      params: {
+                        loanId:
+                          loan.id,
+                      },
+                    });
+                  }}
+                  style={({ pressed }) => [
+                    styles.card,
+                    overdue
+                      ? styles.cardOverdue
+                      : null,
+                    settled
+                      ? styles.cardSettled
+                      : null,
+                    pressed
+                      ? styles.cardPressed
+                      : null,
+                  ]}
                 >
-                  <View
-                    style={
-                      styles.cardHeaderCopy
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.counterparty
-                      }
-                    >
-                      {loan.counterparty_name}
-                    </Text>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.cardIdentity}>
+                      <View
+                        style={[
+                          styles.cardIcon,
+                          overdue
+                            ? styles.cardIconOverdue
+                            : null,
+                          settled
+                            ? styles.cardIconSettled
+                            : null,
+                        ]}
+                      >
+                        <Ionicons
+                          name={
+                            loan.direction
+                              === 'borrowed'
+                              ? 'arrow-down-outline'
+                              : 'arrow-up-outline'
+                          }
+                          size={20}
+                          color={
+                            overdue
+                              ? colors.warning
+                              : settled
+                                ? colors.success
+                                : colors.primary
+                          }
+                        />
+                      </View>
 
-                    <Text
-                      style={
-                        styles.direction
-                      }
-                    >
-                      {loanDirectionLabel(
-                        loan.direction,
-                      )}
-                      {' · '}
-                      {loan.currency_code}
-                    </Text>
-                  </View>
+                      <View style={styles.cardHeaderCopy}>
+                        <Text
+                          numberOfLines={1}
+                          style={styles.counterparty}
+                        >
+                          {loan.counterparty_name}
+                        </Text>
 
-                  <View
-                    style={[
-                      styles.statusPill,
+                        <Text style={styles.direction}>
+                          {loanDirectionLabel(
+                            loan.direction,
+                          )}
+                          {'  |  '}
+                          {loan.currency_code}
+                        </Text>
+                      </View>
+                    </View>
 
-                      loan.is_overdue
-                        ? styles.overduePill
-                        : null,
-
-                      loan.status ===
-                        'settled'
-                        ? styles.settledPill
-                        : null,
-                    ]}
-                  >
-                    <Text
+                    <View
                       style={[
-                        styles.statusText,
-
-                        loan.is_overdue
-                          ? styles.overdueText
+                        styles.statusPill,
+                        overdue
+                          ? styles.statusPillOverdue
                           : null,
-
-                        loan.status ===
-                          'settled'
-                          ? styles.settledText
+                        settled
+                          ? styles.statusPillSettled
                           : null,
                       ]}
                     >
-                      {loan.status ===
-                        'settled'
-                        ? 'Settled'
-                        : loan.is_overdue
-                          ? 'Overdue'
-                          : 'Active'}
-                    </Text>
+                      <Text
+                        style={[
+                          styles.statusText,
+                          overdue
+                            ? styles.statusTextOverdue
+                            : null,
+                          settled
+                            ? styles.statusTextSettled
+                            : null,
+                        ]}
+                      >
+                        {settled
+                          ? 'Settled'
+                          : overdue
+                            ? 'Overdue'
+                            : 'Active'}
+                      </Text>
+                    </View>
                   </View>
-                </View>
 
-
-                <View
-                  style={
-                    styles.moneyRow
-                  }
-                >
-                  <View>
-                    <Text
-                      style={
-                        styles.moneyLabel
-                      }
-                    >
+                  <View style={styles.balanceBlock}>
+                    <Text style={styles.balanceLabel}>
                       Remaining
                     </Text>
 
                     <Text
-                      style={
-                        styles.moneyValue
-                      }
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.7}
+                      style={styles.balanceValue}
                     >
                       {loan.currency_code}{' '}
                       {formatMinor(
@@ -398,113 +461,143 @@ export function LoansScreen() {
                     </Text>
                   </View>
 
-                  <View
-                    style={
-                      styles.moneyRight
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.moneyLabel
-                      }
-                    >
-                      Principal
-                    </Text>
+                  <View style={styles.detailsGrid}>
+                    <View style={styles.detailCell}>
+                      <Text style={styles.detailLabel}>
+                        Principal
+                      </Text>
 
-                    <Text
-                      style={
-                        styles.moneyValue
-                      }
-                    >
-                      {loan.currency_code}{' '}
-                      {formatMinor(
-                        loan.principal_minor,
-                        minorUnit,
-                      )}
-                    </Text>
+                      <Text
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.72}
+                        style={styles.detailValue}
+                      >
+                        {loan.currency_code}{' '}
+                        {formatMinor(
+                          loan.principal_minor,
+                          minorUnit,
+                        )}
+                      </Text>
+                    </View>
+
+                    <View style={styles.detailCell}>
+                      <Text style={styles.detailLabel}>
+                        Interest
+                      </Text>
+
+                      <Text style={styles.detailValue}>
+                        {interestBasisPointsToPercent(
+                          loan.interest_rate_basis_points,
+                        )}
+                      </Text>
+                    </View>
                   </View>
-                </View>
 
+                  <View style={styles.footer}>
+                    <View style={styles.footerItem}>
+                      <Ionicons
+                        name="calendar-outline"
+                        size={15}
+                        color={
+                          overdue
+                            ? colors.warning
+                            : colors.textTertiary
+                        }
+                      />
 
-                <View
-                  style={
-                    styles.metaRow
-                  }
-                >
-                  <Text
-                    style={
-                      styles.metaText
-                    }
-                  >
-                    {interestBasisPointsToPercent(
-                      loan.interest_rate_basis_points,
-                    )}
-                  </Text>
+                      <Text
+                        style={[
+                          styles.footerText,
+                          overdue
+                            ? styles.footerTextOverdue
+                            : null,
+                        ]}
+                      >
+                        {friendlyDueDate(
+                          loan.due_date,
+                        )}
+                      </Text>
+                    </View>
 
-                  <Text
-                    style={
-                      styles.metaText
-                    }
-                  >
-                    {loan.due_date
-                      ? `Due ${loan.due_date}`
-                      : 'No due date'}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          },
-        )}
-      </View>
+                    <Ionicons
+                      name="chevron-forward-outline"
+                      size={18}
+                      color={
+                        colors.textTertiary
+                      }
+                    />
+                  </View>
+                </Pressable>
+              );
+            },
+          )}
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
-
 
 const styles =
   StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor:
+        colors.background,
     },
 
     content: {
       flexGrow: 1,
       width: '100%',
-      maxWidth: layout.contentMaxWidth,
+      maxWidth:
+        layout.contentMaxWidth,
       alignSelf: 'center',
+      gap:
+        spacing.lg,
       paddingHorizontal:
         layout.screenHorizontalPadding,
-      paddingTop: spacing.lg,
-      paddingBottom: 120,
+      paddingTop:
+        spacing.lg,
+      paddingBottom:
+        spacing.xl,
     },
 
-    headerRow: {
+    header: {
+      gap:
+        spacing.lg,
+    },
+
+    headerTop: {
       flexDirection: 'row',
       alignItems: 'flex-start',
-      gap: spacing.md,
-      marginBottom: spacing.lg,
+      gap:
+        spacing.md,
     },
 
     headerCopy: {
       flex: 1,
       minWidth: 0,
+      gap:
+        spacing.xs,
     },
 
     eyebrow: {
-      color: colors.primary,
-      fontSize: typography.caption,
+      color:
+        colors.primary,
+      fontSize:
+        typography.caption,
       lineHeight:
         typography.lineHeightCaption,
       fontWeight:
-        typography.weightBold,
-      letterSpacing: 1.2,
+        typography.weightExtraBold,
+      letterSpacing: 1.1,
     },
 
     title: {
-      marginTop: spacing.sm,
-      color: colors.text,
-      fontSize: typography.title,
+      color:
+        colors.text,
+      fontSize:
+        typography.title,
       lineHeight:
         typography.lineHeightTitle,
       fontWeight:
@@ -513,151 +606,188 @@ const styles =
     },
 
     subtitle: {
-      marginTop: spacing.sm,
-      color: colors.textSecondary,
-      fontSize: typography.small,
+      maxWidth: 460,
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.small,
       lineHeight:
         typography.lineHeightSmall,
     },
 
     addButton: {
-      minHeight: layout.touchTarget,
-      paddingHorizontal: spacing.md,
+      width:
+        layout.touchTarget,
+      height:
+        layout.touchTarget,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: radii.md,
-      backgroundColor: colors.primary,
-    },
-
-    addButtonText: {
-      color: colors.textOnPrimary,
-      fontSize: typography.small,
-      fontWeight:
-        typography.weightBold,
-    },
-
-    stateCard: {
-      padding: spacing.lg,
-      borderRadius: radii.lg,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
+      borderRadius:
+        radii.md,
+      backgroundColor:
+        colors.primary,
       ...elevation.card,
     },
 
-    errorCard: {
-      backgroundColor:
-        colors.dangerSurface,
-      borderColor: colors.danger,
+    addButtonPressed: {
+      opacity: 0.84,
+      transform: [
+        {
+          scale: 0.97,
+        },
+      ],
     },
 
-    errorTitle: {
-      color: colors.danger,
-      fontSize: typography.body,
-      lineHeight:
-        typography.lineHeightBody,
-      fontWeight:
-        typography.weightBold,
-    },
-
-    stateText: {
-      marginTop: spacing.xs,
-      color: colors.textSecondary,
-      fontSize: typography.small,
-      lineHeight:
-        typography.lineHeightSmall,
-    },
-
-    retryButton: {
-      alignSelf: 'flex-start',
-      marginTop: spacing.md,
-      minHeight: layout.touchTarget,
-      paddingHorizontal: spacing.md,
+    summaryCard: {
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.md,
-      backgroundColor: colors.primary,
+      padding:
+        spacing.md,
+      borderRadius:
+        radii.lg,
+      borderWidth: 1,
+      borderColor:
+        colors.border,
+      backgroundColor:
+        colors.surface,
+      ...elevation.card,
     },
 
-    retryButtonText: {
-      color: colors.textOnPrimary,
-      fontSize: typography.small,
+    summaryItem: {
+      flex: 1,
+      alignItems: 'center',
+      gap:
+        spacing.xxs,
+    },
+
+    summaryDivider: {
+      width: 1,
+      height: 34,
+      backgroundColor:
+        colors.border,
+    },
+
+    summaryValue: {
+      color:
+        colors.text,
+      fontSize:
+        typography.subheading,
+      lineHeight:
+        typography.lineHeightSubheading,
       fontWeight:
-        typography.weightBold,
+        typography.weightExtraBold,
+    },
+
+    summaryPrimary: {
+      color:
+        colors.primary,
+    },
+
+    summaryWarning: {
+      color:
+        colors.warning,
+    },
+
+    summarySuccess: {
+      color:
+        colors.success,
+    },
+
+    summaryLabel: {
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
     },
 
     emptyCard: {
-      padding: spacing.lg,
-      borderRadius: radii.lg,
-      backgroundColor: colors.surface,
+      alignItems: 'center',
+      gap:
+        spacing.sm,
+      padding:
+        spacing.xl,
+      borderRadius:
+        radii.xl,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor:
+        colors.border,
+      backgroundColor:
+        colors.surface,
       ...elevation.card,
     },
 
+    emptyIcon: {
+      width: 56,
+      height: 56,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius:
+        radii.lg,
+      backgroundColor:
+        colors.primarySoft,
+      marginBottom:
+        spacing.xs,
+    },
+
     emptyTitle: {
-      color: colors.text,
-      fontSize: typography.subheading,
+      color:
+        colors.text,
+      fontSize:
+        typography.subheading,
       lineHeight:
         typography.lineHeightSubheading,
       fontWeight:
         typography.weightBold,
+      textAlign: 'center',
     },
 
     emptyBody: {
-      marginTop: spacing.xs,
-      color: colors.textSecondary,
-      fontSize: typography.small,
+      maxWidth: 390,
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.small,
       lineHeight:
         typography.lineHeightSmall,
-    },
-
-    primaryButton: {
-      alignSelf: 'flex-start',
-      minHeight: layout.touchTarget,
-      marginTop: spacing.md,
-      paddingHorizontal: spacing.md,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.md,
-      backgroundColor: colors.primary,
-    },
-
-    primaryButtonText: {
-      color: colors.textOnPrimary,
-      fontSize: typography.small,
-      fontWeight:
-        typography.weightBold,
+      textAlign: 'center',
     },
 
     list: {
-      gap: spacing.md,
+      gap:
+        spacing.md,
     },
 
     card: {
-      padding: spacing.md,
-      borderRadius: radii.lg,
-      backgroundColor: colors.surface,
+      gap:
+        spacing.md,
+      padding:
+        spacing.md,
+      borderRadius:
+        radii.lg,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor:
+        colors.border,
+      backgroundColor:
+        colors.surface,
       ...elevation.card,
     },
 
-    overdueCard: {
-      backgroundColor:
-        colors.warningSurface,
-      borderColor: colors.warning,
+    cardOverdue: {
+      borderColor:
+        colors.warning,
     },
 
-    settledCard: {
-      backgroundColor:
-        colors.successSurface,
+    cardSettled: {
       borderColor:
         colors.accentStrong,
+      backgroundColor:
+        colors.successSurface,
     },
 
-    pressed: {
-      opacity: 0.82,
+    cardPressed: {
+      opacity: 0.84,
       transform: [
         {
           scale: 0.995,
@@ -668,7 +798,40 @@ const styles =
     cardHeader: {
       flexDirection: 'row',
       alignItems: 'flex-start',
-      gap: spacing.md,
+      justifyContent:
+        'space-between',
+      gap:
+        spacing.sm,
+    },
+
+    cardIdentity: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap:
+        spacing.sm,
+    },
+
+    cardIcon: {
+      width: 40,
+      height: 40,
+      borderRadius:
+        radii.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor:
+        colors.primarySoft,
+    },
+
+    cardIconOverdue: {
+      backgroundColor:
+        colors.warningSurface,
+    },
+
+    cardIconSettled: {
+      backgroundColor:
+        colors.successSurface,
     },
 
     cardHeaderCopy: {
@@ -677,99 +840,169 @@ const styles =
     },
 
     counterparty: {
-      color: colors.text,
-      fontSize: typography.subheading,
-      lineHeight:
-        typography.lineHeightSubheading,
-      fontWeight:
-        typography.weightBold,
-    },
-
-    direction: {
-      marginTop: spacing.xxs,
-      color: colors.textSecondary,
-      fontSize: typography.caption,
-      lineHeight:
-        typography.lineHeightCaption,
-    },
-
-    statusPill: {
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.xs,
-      borderRadius: radii.pill,
-      backgroundColor:
-        colors.neutralSurface,
-    },
-
-    overduePill: {
-      backgroundColor:
-        colors.warningSurface,
-    },
-
-    settledPill: {
-      backgroundColor:
-        colors.successSurface,
-    },
-
-    statusText: {
-      color: colors.neutral,
-      fontSize: typography.caption,
-      lineHeight:
-        typography.lineHeightCaption,
-      fontWeight:
-        typography.weightBold,
-    },
-
-    overdueText: {
-      color: colors.warning,
-    },
-
-    settledText: {
-      color: colors.success,
-    },
-
-    moneyRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      gap: spacing.md,
-      marginTop: spacing.md,
-    },
-
-    moneyRight: {
-      alignItems: 'flex-end',
-    },
-
-    moneyLabel: {
-      color: colors.textTertiary,
-      fontSize: typography.caption,
-      lineHeight:
-        typography.lineHeightCaption,
-      fontWeight:
-        typography.weightSemibold,
-    },
-
-    moneyValue: {
-      marginTop: spacing.xxs,
-      color: colors.text,
-      fontSize: typography.body,
+      color:
+        colors.text,
+      fontSize:
+        typography.body,
       lineHeight:
         typography.lineHeightBody,
       fontWeight:
         typography.weightBold,
     },
 
-    metaRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      flexWrap: 'wrap',
-      gap: spacing.sm,
-      marginTop: spacing.md,
-    },
-
-    metaText: {
-      color: colors.textTertiary,
-      fontSize: typography.caption,
+    direction: {
+      marginTop:
+        spacing.xxs,
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.caption,
       lineHeight:
         typography.lineHeightCaption,
+    },
+
+    statusPill: {
+      paddingHorizontal:
+        spacing.sm,
+      paddingVertical:
+        spacing.xs,
+      borderRadius:
+        radii.pill,
+      backgroundColor:
+        colors.neutralSurface,
+    },
+
+    statusPillOverdue: {
+      backgroundColor:
+        colors.warningSurface,
+    },
+
+    statusPillSettled: {
+      backgroundColor:
+        colors.successSurface,
+    },
+
+    statusText: {
+      color:
+        colors.neutral,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+      fontWeight:
+        typography.weightBold,
+    },
+
+    statusTextOverdue: {
+      color:
+        colors.warning,
+    },
+
+    statusTextSettled: {
+      color:
+        colors.success,
+    },
+
+    balanceBlock: {
+      gap:
+        spacing.xxs,
+    },
+
+    balanceLabel: {
+      color:
+        colors.textTertiary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+    },
+
+    balanceValue: {
+      color:
+        colors.text,
+      fontSize:
+        typography.heading,
+      lineHeight:
+        typography.lineHeightHeading,
+      fontWeight:
+        typography.weightExtraBold,
+      letterSpacing: -0.5,
+    },
+
+    detailsGrid: {
+      flexDirection: 'row',
+      gap:
+        spacing.sm,
+    },
+
+    detailCell: {
+      flex: 1,
+      minWidth: 0,
+      padding:
+        spacing.sm,
+      borderRadius:
+        radii.md,
+      backgroundColor:
+        colors.surfaceMuted,
+    },
+
+    detailLabel: {
+      color:
+        colors.textTertiary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+    },
+
+    detailValue: {
+      marginTop:
+        spacing.xxs,
+      color:
+        colors.text,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+      fontWeight:
+        typography.weightBold,
+    },
+
+    footer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent:
+        'space-between',
+      gap:
+        spacing.sm,
+      paddingTop:
+        spacing.sm,
+      borderTopWidth:
+        StyleSheet.hairlineWidth,
+      borderTopColor:
+        colors.border,
+    },
+
+    footerItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap:
+        spacing.xs,
+    },
+
+    footerText: {
+      color:
+        colors.textTertiary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+    },
+
+    footerTextOverdue: {
+      color:
+        colors.warning,
+      fontWeight:
+        typography.weightBold,
     },
   });

@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "finance-coach",
+    "name": "Finance Coach",
     "slug": "finance-coach",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "financecoach",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/expo.icon"
     },
@@ -29,7 +29,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#F4F7F5",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
@@ -46,6 +46,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "305c126e-a8a4-4454-8ab5-954ffd607c73"
+      }
+    },
+    "owner": "f2024"
   }
 }

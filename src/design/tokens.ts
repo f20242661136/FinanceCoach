@@ -1,42 +1,42 @@
 import { Platform } from 'react-native';
 
 export const colors = {
-  background: '#F4F7F5',
+  background: '#F6F8F7',
   surface: '#FFFFFF',
   surfaceElevated: '#FFFFFF',
-  surfaceMuted: '#EDF3EF',
-  surfaceStrong: '#E4ECE7',
+  surfaceMuted: '#EEF3F0',
+  surfaceStrong: '#E7EEEA',
 
   primary: '#123D30',
   primaryPressed: '#0D3026',
-  primarySoft: '#E3F1EA',
+  primarySoft: '#DDEDE5',
 
-  accent: '#D9EFE4',
+  accent: '#DDEDE5',
   accentStrong: '#A9D7C0',
 
   text: '#102019',
-  textSecondary: '#617068',
-  textTertiary: '#829087',
+  textSecondary: '#647069',
+  textTertiary: '#89928D',
   textOnPrimary: '#FFFFFF',
 
-  border: '#DCE5E0',
-  borderStrong: '#C5D2CB',
+  border: '#E2E8E4',
+  borderStrong: '#CBD6D0',
   focus: '#2A775B',
 
-  danger: '#B42318',
-  dangerSurface: '#FDECEA',
+  danger: '#B23D35',
+  dangerSurface: '#FBEDEC',
 
   success: '#237A57',
   successSurface: '#E7F5ED',
 
-  warning: '#8A5A00',
-  warningSurface: '#FFF4D6',
+  warning: '#936515',
+  warningSurface: '#FFF5DD',
 
-  info: '#285F91',
-  infoSurface: '#EAF2FB',
+  info: '#315F86',
+  infoSurface: '#ECF3F9',
 
-  neutral: '#526159',
-  neutralSurface: '#EEF2F0',
+  neutral: '#56635D',
+  neutralSurface: '#F0F3F1',
 
   white: '#FFFFFF',
   overlay: 'rgba(16, 32, 25, 0.08)',
@@ -45,8 +45,8 @@ export const colors = {
 
 export const spacing = {
   xxs: 4,
-  xs: 6,
-  sm: 10,
+  xs: 8,
+  sm: 12,
   md: 16,
   lg: 24,
   xl: 32,
@@ -56,29 +56,29 @@ export const spacing = {
 
 export const radii = {
   xs: 8,
-  sm: 10,
+  sm: 12,
   md: 16,
-  lg: 22,
-  xl: 28,
+  lg: 18,
+  xl: 24,
   pill: 999,
 } as const;
 
 export const typography = {
-  display: 40,
-  title: 34,
+  display: 36,
+  title: 28,
   heading: 24,
   subheading: 18,
   body: 16,
   small: 14,
   caption: 12,
 
-  lineHeightDisplay: 46,
-  lineHeightTitle: 40,
+  lineHeightDisplay: 42,
+  lineHeightTitle: 34,
   lineHeightHeading: 32,
   lineHeightSubheading: 24,
   lineHeightBody: 24,
   lineHeightSmall: 20,
-  lineHeightCaption: 18,
+  lineHeightCaption: 16,
 
   weightRegular: '400',
   weightMedium: '500',
@@ -88,12 +88,13 @@ export const typography = {
 } as const;
 
 export const layout = {
-  contentMaxWidth: 520,
+  contentMaxWidth: 680,
+  contentWideMaxWidth: 1180,
   touchTarget: 48,
-  screenHorizontalPadding: spacing.md,
+  screenHorizontalPadding: 20,
   screenVerticalPadding: spacing.lg,
-  cardPadding: spacing.md,
-  tabBarHeight: 68,
+  cardPadding: 20,
+  tabBarHeight: 72,
 } as const;
 
 export const elevation = {
@@ -105,10 +106,10 @@ export const elevation = {
       shadowColor: '#102019',
       shadowOffset: {
         width: 0,
-        height: 2,
+        height: 4,
       },
       shadowOpacity: 0.06,
-      shadowRadius: 8,
+      shadowRadius: 16,
     },
   }) ?? {},
 
@@ -120,10 +121,10 @@ export const elevation = {
       shadowColor: '#102019',
       shadowOffset: {
         width: 0,
-        height: 4,
+        height: 8,
       },
-      shadowOpacity: 0.12,
-      shadowRadius: 14,
+      shadowOpacity: 0.1,
+      shadowRadius: 24,
     },
   }) ?? {},
 } as const;

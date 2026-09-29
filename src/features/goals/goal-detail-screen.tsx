@@ -1,11 +1,25 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+
 import {
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+
+import {
+  useLocalSearchParams,
+  useRouter,
+} from 'expo-router';
+
+import {
+  AppButton,
+} from '@/components/ui/app-button';
+
+import {
+  StatePanel,
+} from '@/components/ui/state-panel';
 
 import {
   colors,
@@ -17,9 +31,8 @@ import {
 } from '@/design/tokens';
 
 import {
-  useLocalSearchParams,
-  useRouter,
-} from 'expo-router';
+  toUserFacingError,
+} from '@/lib/user-facing-error';
 
 import {
   useLocalFinanceReferenceData,
@@ -39,7 +52,6 @@ import {
   useSavingsGoalStatus,
 } from './savings-goal-query';
 
-
 function firstParam(
   value:
     | string
@@ -53,6 +65,50 @@ function firstParam(
     : value ?? '';
 }
 
+function friendlyDate(
+  value: string | null,
+): string {
+  if (!value) {
+    return 'No target date';
+  }
+
+  const parsed =
+    new Date(
+      `${value}T00:00:00`,
+    );
+
+  if (
+    Number.isNaN(
+      parsed.getTime(),
+    )
+  ) {
+    return value;
+  }
+
+  return parsed.toLocaleDateString(
+    undefined,
+    {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    },
+  );
+}
+
+function goalTypeLabel(
+  value: string,
+): string {
+  return value
+    .replace(
+      /_/g,
+      ' ',
+    )
+    .replace(
+      /\b\w/g,
+      letter =>
+        letter.toUpperCase(),
+    );
+}
 
 export function GoalDetailScreen() {
   const router =
@@ -84,12 +140,11 @@ export function GoalDetailScreen() {
   const goal =
     goalsQuery.data
       ?.find(
-        (item) =>
-          item.id ===
-          goalId,
+        item =>
+          item.id
+          === goalId,
       )
     ?? null;
-
 
   const minorUnit =
     goal
@@ -97,20 +152,18 @@ export function GoalDetailScreen() {
           reference.data
             ?.currencies
             .find(
-              (currency) =>
-                currency.code ===
-                goal.currency_code,
+              currency =>
+                currency.code
+                === goal.currency_code,
             )
             ?.minorUnit
           ?? 2
         )
       : 2;
 
-
   const refreshing =
     goalsQuery.isRefetching
     || historyQuery.isRefetching;
-
 
   async function refresh() {
     await Promise.all([
@@ -119,27 +172,28 @@ export function GoalDetailScreen() {
     ]);
   }
 
-
-  if (
-    !goalId
-  ) {
+  if (!goalId) {
     return (
-      <View
-        style={
-          styles.centered
-        }
-      >
-        <Text
-          style={
-            styles.errorTitle
+      <View style={styles.centered}>
+        <StatePanel
+          title="Goal unavailable"
+          description="This goal link is missing the information needed to open it."
+          icon="alert-circle-outline"
+          tone="danger"
+          action={
+            <AppButton
+              label="Go back"
+              variant="secondary"
+              fullWidth={false}
+              onPress={() => {
+                router.back();
+              }}
+            />
           }
-        >
-          Goal unavailable
-        </Text>
+        />
       </View>
     );
   }
-
 
   if (
     goalsQuery.isLoading
@@ -149,118 +203,141 @@ export function GoalDetailScreen() {
     )
   ) {
     return (
-      <View
-        style={
-          styles.centered
-        }
-      >
-        <Text
-          style={
-            styles.muted
-          }
-        >
-          Loading goal…
-        </Text>
+      <View style={styles.centered}>
+        <StatePanel
+          loading
+          title="Loading goal"
+          description="Preparing your target, progress, and contribution history."
+        />
       </View>
     );
   }
 
+  if (
+    goalsQuery.error
+    && !goal
+  ) {
+    return (
+      <View style={styles.centered}>
+        <StatePanel
+          title="Goal unavailable"
+          description={
+            toUserFacingError(
+              goalsQuery.error,
+              'goal',
+            )
+          }
+          icon="alert-circle-outline"
+          tone="danger"
+          action={
+            <AppButton
+              label="Try again"
+              variant="secondary"
+              fullWidth={false}
+              onPress={() => {
+                void goalsQuery.refetch();
+              }}
+            />
+          }
+        />
+      </View>
+    );
+  }
 
   if (!goal) {
     return (
-      <View
-        style={
-          styles.centered
-        }
-      >
-        <Text
-          style={
-            styles.errorTitle
+      <View style={styles.centered}>
+        <StatePanel
+          title="Goal not found"
+          description="This goal may no longer be available."
+          icon="flag-outline"
+          action={
+            <AppButton
+              label="Go back"
+              variant="secondary"
+              fullWidth={false}
+              onPress={() => {
+                router.back();
+              }}
+            />
           }
-        >
-          Goal not found
-        </Text>
+        />
       </View>
     );
   }
 
-
   const history =
     historyQuery.data
-      ?? [];
-
+    ?? [];
 
   return (
     <ScrollView
-      style={
-        styles.screen
-      }
+      style={styles.screen}
       contentContainerStyle={
         styles.content
       }
+      showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
-          refreshing={
-            refreshing
-          }
+          refreshing={refreshing}
           onRefresh={() => {
             void refresh();
           }}
         />
       }
     >
-      <Text
-        style={
-          styles.eyebrow
-        }
-      >
-        GOAL
-      </Text>
+      <View style={styles.header}>
+        <Text style={styles.eyebrow}>
+          SAVINGS GOAL
+        </Text>
 
-      <Text
-        style={
-          styles.title
-        }
-      >
-        {goal.name}
-      </Text>
+        <Text
+          accessibilityRole="header"
+          style={styles.title}
+        >
+          {goal.name}
+        </Text>
 
-      <Text
-        style={
-          styles.subtitle
-        }
-      >
-        {goal.currency_code}
-        {goal.target_date
-          ? ` · Target ${goal.target_date}`
-          : ' · No target date'}
-      </Text>
+        <View style={styles.metaRow}>
+          <View style={styles.metaPill}>
+            <Text style={styles.metaPillText}>
+              {goalTypeLabel(
+                goal.goal_type,
+              )}
+            </Text>
+          </View>
 
+          <Text style={styles.metaText}>
+            {goal.currency_code}
+          </Text>
+
+          <Text style={styles.metaDot}>
+            |
+          </Text>
+
+          <Text style={styles.metaText}>
+            {friendlyDate(
+              goal.target_date,
+            )}
+          </Text>
+        </View>
+      </View>
 
       <View
-        style={
-          styles.heroCard
-        }
+        style={[
+          styles.heroCard,
+          goal.is_target_reached
+            ? styles.heroCardComplete
+            : null,
+        ]}
       >
-        <View
-          style={
-            styles.heroTop
-          }
-        >
-          <View>
-            <Text
-              style={
-                styles.heroLabel
-              }
-            >
+        <View style={styles.heroTop}>
+          <View style={styles.heroMain}>
+            <Text style={styles.heroLabel}>
               Progress
             </Text>
 
-            <Text
-              style={
-                styles.heroPercent
-              }
-            >
+            <Text style={styles.heroPercent}>
               {formatGoalProgressPercent(
                 goal.progress_basis_points,
               )}
@@ -268,22 +345,91 @@ export function GoalDetailScreen() {
           </View>
 
           <View
-            style={
-              styles.heroRight
-            }
+            style={[
+              styles.heroStatus,
+              goal.is_target_reached
+                ? styles.heroStatusComplete
+                : null,
+            ]}
           >
-            <Text
-              style={
-                styles.heroLabel
+            <Ionicons
+              name={
+                goal.is_target_reached
+                  ? 'checkmark-circle-outline'
+                  : 'flag-outline'
               }
+              size={18}
+              color={
+                goal.is_target_reached
+                  ? colors.success
+                  : colors.accentStrong
+              }
+            />
+
+            <Text
+              style={[
+                styles.heroStatusText,
+                goal.is_target_reached
+                  ? styles.heroStatusTextComplete
+                  : null,
+              ]}
             >
+              {goal.is_target_reached
+                ? 'Target reached'
+                : 'In progress'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.progressTrack}>
+          <View
+            style={[
+              styles.progressFill,
+              {
+                width:
+                  goalProgressWidth(
+                    goal.progress_basis_points,
+                  ),
+              },
+              goal.is_target_reached
+                ? styles.progressFillComplete
+                : null,
+            ]}
+          />
+        </View>
+
+        <View style={styles.moneyGrid}>
+          <View style={styles.moneyCell}>
+            <Text style={styles.moneyLabel}>
+              Saved
+            </Text>
+
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+              style={styles.moneyValue}
+            >
+              {goal.currency_code}{' '}
+              {formatMinor(
+                goal.contributed_minor,
+                minorUnit,
+              )}
+            </Text>
+          </View>
+
+          <View style={styles.moneyDivider} />
+
+          <View style={styles.moneyCell}>
+            <Text style={styles.moneyLabel}>
               Remaining
             </Text>
 
             <Text
-              style={
-                styles.heroMoney
-              }
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+              style={styles.moneyValue}
             >
               {goal.currency_code}{' '}
               {formatMinor(
@@ -294,51 +440,17 @@ export function GoalDetailScreen() {
           </View>
         </View>
 
-
-        <View
-          style={
-            styles.progressTrack
-          }
-        >
-          <View
-            style={[
-              styles.progressFill,
-
-              {
-                width:
-                  goalProgressWidth(
-                    goal.progress_basis_points,
-                  ),
-              },
-            ]}
-          />
-        </View>
-
-
-        <View
-          style={
-            styles.savedRow
-          }
-        >
-          <Text
-            style={
-              styles.savedText
-            }
-          >
-            Saved{' '}
-            {goal.currency_code}{' '}
-            {formatMinor(
-              goal.contributed_minor,
-              minorUnit,
-            )}
+        <View style={styles.targetStrip}>
+          <Text style={styles.targetLabel}>
+            Target
           </Text>
 
           <Text
-            style={
-              styles.savedText
-            }
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+            style={styles.targetValue}
           >
-            Target{' '}
             {goal.currency_code}{' '}
             {formatMinor(
               goal.target_amount_minor,
@@ -347,230 +459,250 @@ export function GoalDetailScreen() {
           </Text>
         </View>
 
-
-        <Pressable
-          accessibilityRole="button"
-          disabled={
-            goal.is_target_reached
-          }
-          onPress={() => {
-            router.push({
-              pathname:
-                '/goal-contribute' as never,
-
-              params: {
-                goalId:
-                  goal.id,
-              },
-            });
-          }}
-          style={[
-            styles.contributeButton,
-
-            goal.is_target_reached
-              ? styles.contributeButtonDisabled
-              : null,
-          ]}
-        >
-          <Text
-            style={
-              styles.contributeButtonText
-            }
-          >
-            {goal.is_target_reached
-              ? 'Target reached'
-              : 'Add contribution'}
-          </Text>
-        </Pressable>
+        {!goal.is_target_reached ? (
+          <AppButton
+            label="Add contribution"
+            icon="add-outline"
+            onPress={() => {
+              router.push({
+                pathname:
+                  '/goal-contribute' as never,
+                params: {
+                  goalId:
+                    goal.id,
+                },
+              });
+            }}
+          />
+        ) : null}
       </View>
-
 
       {goal.notes ? (
-        <View
-          style={
-            styles.noteCard
-          }
-        >
-          <Text
-            style={
-              styles.sectionTitle
-            }
-          >
-            Notes
-          </Text>
+        <View style={styles.noteCard}>
+          <View style={styles.noteIcon}>
+            <Ionicons
+              name="document-text-outline"
+              size={19}
+              color={
+                colors.primary
+              }
+            />
+          </View>
 
-          <Text
-            style={
-              styles.noteText
-            }
-          >
-            {goal.notes}
-          </Text>
+          <View style={styles.noteCopy}>
+            <Text style={styles.noteTitle}>
+              Notes
+            </Text>
+
+            <Text style={styles.noteText}>
+              {goal.notes}
+            </Text>
+          </View>
         </View>
       ) : null}
 
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text style={styles.sectionTitle}>
+            Contribution history
+          </Text>
 
-      <View
-        style={
-          styles.sectionHeader
-        }
-      >
-        <Text
-          style={
-            styles.sectionTitle
-          }
-        >
-          Contribution history
-        </Text>
+          <Text style={styles.sectionBody}>
+            Separate records that build progress for this goal.
+          </Text>
+        </View>
 
-        <Text
-          style={
-            styles.sectionMeta
-          }
-        >
-          {goal.contribution_count}{' '}
-          total
+        <Text style={styles.sectionMeta}>
+          {goal.contribution_count}
+          {' total'}
         </Text>
       </View>
 
-
-      {historyQuery.isLoading ? (
-        <Text
-          style={
-            styles.muted
+      {historyQuery.error ? (
+        <StatePanel
+          title="History unavailable"
+          description={
+            toUserFacingError(
+              historyQuery.error,
+              'goal',
+            )
           }
-        >
-          Loading history…
-        </Text>
-      ) : null}
-
-
-      {!historyQuery.isLoading
-      && history.length === 0 ? (
-        <View
-          style={
-            styles.emptyHistory
+          icon="alert-circle-outline"
+          tone="danger"
+          action={
+            <AppButton
+              label="Try again"
+              variant="secondary"
+              fullWidth={false}
+              onPress={() => {
+                void historyQuery.refetch();
+              }}
+            />
           }
-        >
-          <Text
-            style={
-              styles.emptyTitle
-            }
-          >
-            No contributions yet
-          </Text>
+        />
+      ) : historyQuery.isLoading ? (
+        <StatePanel
+          loading
+          title="Loading contributions"
+          description="Checking the contribution history for this goal."
+        />
+      ) : history.length === 0 ? (
+        <View style={styles.emptyHistory}>
+          <View style={styles.emptyIcon}>
+            <Ionicons
+              name="add-circle-outline"
+              size={23}
+              color={
+                colors.primary
+              }
+            />
+          </View>
 
-          <Text
-            style={
-              styles.muted
-            }
-          >
-            Your contribution history will appear here.
-          </Text>
+          <View style={styles.emptyCopy}>
+            <Text style={styles.emptyTitle}>
+              No contributions yet
+            </Text>
+
+            <Text style={styles.emptyBody}>
+              Add your first contribution when you want to record progress toward this target.
+            </Text>
+          </View>
         </View>
-      ) : null}
-
-
-      <View
-        style={
-          styles.historyList
-        }
-      >
-        {history.map(
-          (item) => (
-            <View
-              key={
-                item.id
-              }
-              style={
-                styles.historyRow
-              }
-            >
-              <View
-                style={
-                  styles.historyCopy
-                }
-              >
-                <Text
-                  style={
-                    styles.historyDate
-                  }
-                >
-                  {item.contribution_date}
-                </Text>
-
-                {item.note ? (
-                  <Text
-                    numberOfLines={2}
-                    style={
-                      styles.historyNote
-                    }
-                  >
-                    {item.note}
-                  </Text>
+      ) : (
+        <View style={styles.historyCard}>
+          {history.map(
+            (
+              item,
+              index,
+            ) => (
+              <View key={item.id}>
+                {index > 0 ? (
+                  <View style={styles.divider} />
                 ) : null}
-              </View>
 
-              <Text
-                style={
-                  styles.historyAmount
-                }
-              >
-                + {goal.currency_code}{' '}
-                {formatMinor(
-                  item.amount_minor,
-                  minorUnit,
-                )}
-              </Text>
-            </View>
-          ),
-        )}
+                <View style={styles.historyRow}>
+                  <View style={styles.historyIcon}>
+                    <Ionicons
+                      name="arrow-up-outline"
+                      size={17}
+                      color={
+                        colors.success
+                      }
+                    />
+                  </View>
+
+                  <View style={styles.historyCopy}>
+                    <Text style={styles.historyDate}>
+                      {friendlyDate(
+                        item.contribution_date,
+                      )}
+                    </Text>
+
+                    {item.note ? (
+                      <Text
+                        numberOfLines={2}
+                        style={styles.historyNote}
+                      >
+                        {item.note}
+                      </Text>
+                    ) : (
+                      <Text style={styles.historyNote}>
+                        Goal contribution
+                      </Text>
+                    )}
+                  </View>
+
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.72}
+                    style={styles.historyAmount}
+                  >
+                    +{goal.currency_code}{' '}
+                    {formatMinor(
+                      item.amount_minor,
+                      minorUnit,
+                    )}
+                  </Text>
+                </View>
+              </View>
+            ),
+          )}
+        </View>
+      )}
+
+      <View style={styles.planningNotice}>
+        <Ionicons
+          name="information-circle-outline"
+          size={20}
+          color={
+            colors.primary
+          }
+        />
+
+        <Text style={styles.planningText}>
+          Goal contributions are progress records. They do not automatically move money between real accounts.
+        </Text>
       </View>
     </ScrollView>
   );
 }
 
-
 const styles =
   StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor:
+        colors.background,
+    },
+
+    centered: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal:
+        layout.screenHorizontalPadding,
+      backgroundColor:
+        colors.background,
     },
 
     content: {
       flexGrow: 1,
       width: '100%',
-      maxWidth: layout.contentMaxWidth,
+      maxWidth:
+        layout.contentMaxWidth,
       alignSelf: 'center',
+      gap:
+        spacing.lg,
       paddingHorizontal:
         layout.screenHorizontalPadding,
-      paddingTop: spacing.lg,
-      paddingBottom: 120,
+      paddingTop:
+        spacing.lg,
+      paddingBottom:
+        spacing.xl,
     },
 
-    centered: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: spacing.lg,
-      backgroundColor: colors.background,
+    header: {
+      gap:
+        spacing.xs,
     },
 
     eyebrow: {
-      color: colors.primary,
-      fontSize: typography.caption,
+      color:
+        colors.primary,
+      fontSize:
+        typography.caption,
       lineHeight:
         typography.lineHeightCaption,
       fontWeight:
-        typography.weightBold,
-      letterSpacing: 1.2,
+        typography.weightExtraBold,
+      letterSpacing: 1.1,
     },
 
     title: {
-      marginTop: spacing.sm,
-      color: colors.text,
-      fontSize: typography.title,
+      color:
+        colors.text,
+      fontSize:
+        typography.title,
       lineHeight:
         typography.lineHeightTitle,
       fontWeight:
@@ -578,204 +710,423 @@ const styles =
       letterSpacing: -0.6,
     },
 
-    subtitle: {
-      marginTop: spacing.xs,
-      color: colors.textSecondary,
-      fontSize: typography.small,
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap:
+        spacing.xs,
+    },
+
+    metaPill: {
+      paddingHorizontal:
+        spacing.sm,
+      paddingVertical:
+        spacing.xs,
+      borderRadius:
+        radii.pill,
+      backgroundColor:
+        colors.primarySoft,
+    },
+
+    metaPillText: {
+      color:
+        colors.primary,
+      fontSize:
+        typography.caption,
       lineHeight:
-        typography.lineHeightSmall,
+        typography.lineHeightCaption,
+      fontWeight:
+        typography.weightBold,
+    },
+
+    metaText: {
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+    },
+
+    metaDot: {
+      color:
+        colors.textTertiary,
+      fontSize:
+        typography.caption,
     },
 
     heroCard: {
-      marginTop: spacing.lg,
-      padding: spacing.lg,
-      borderRadius: radii.lg,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      ...elevation.card,
+      gap:
+        spacing.lg,
+      padding:
+        spacing.lg,
+      borderRadius:
+        radii.xl,
+      backgroundColor:
+        colors.primary,
+      ...elevation.floating,
+    },
+
+    heroCardComplete: {
+      backgroundColor:
+        colors.text,
     },
 
     heroTop: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
-      gap: spacing.md,
+      alignItems: 'flex-start',
+      justifyContent:
+        'space-between',
+      gap:
+        spacing.md,
     },
 
-    heroRight: {
-      alignItems: 'flex-end',
+    heroMain: {
+      flex: 1,
+      minWidth: 0,
     },
 
     heroLabel: {
-      color: colors.textTertiary,
-      fontSize: typography.caption,
+      color:
+        colors.accentStrong,
+      fontSize:
+        typography.caption,
       lineHeight:
         typography.lineHeightCaption,
       fontWeight:
-        typography.weightSemibold,
+        typography.weightBold,
     },
 
     heroPercent: {
-      marginTop: spacing.xxs,
-      color: colors.primary,
-      fontSize: 30,
-      lineHeight: 36,
+      marginTop:
+        spacing.xxs,
+      color:
+        colors.textOnPrimary,
+      fontSize: 34,
+      lineHeight: 40,
       fontWeight:
         typography.weightExtraBold,
+      letterSpacing: -0.7,
     },
 
-    heroMoney: {
-      marginTop: spacing.xs,
-      color: colors.text,
-      fontSize: typography.body,
+    heroStatus: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap:
+        spacing.xs,
+      paddingHorizontal:
+        spacing.sm,
+      paddingVertical:
+        spacing.xs,
+      borderRadius:
+        radii.pill,
+      backgroundColor:
+        colors.focus,
+    },
+
+    heroStatusComplete: {
+      backgroundColor:
+        colors.successSurface,
+    },
+
+    heroStatusText: {
+      color:
+        colors.accentStrong,
+      fontSize:
+        typography.caption,
       lineHeight:
-        typography.lineHeightBody,
+        typography.lineHeightCaption,
       fontWeight:
         typography.weightBold,
+    },
+
+    heroStatusTextComplete: {
+      color:
+        colors.success,
     },
 
     progressTrack: {
       height: 10,
-      marginTop: spacing.md,
       overflow: 'hidden',
-      borderRadius: radii.pill,
+      borderRadius:
+        radii.pill,
       backgroundColor:
-        colors.surfaceStrong,
+        colors.focus,
     },
 
     progressFill: {
       height: '100%',
-      borderRadius: radii.pill,
-      backgroundColor: colors.primary,
+      borderRadius:
+        radii.pill,
+      backgroundColor:
+        colors.accentStrong,
     },
 
-    savedRow: {
+    progressFillComplete: {
+      backgroundColor:
+        colors.success,
+    },
+
+    moneyGrid: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'space-between',
-      gap: spacing.sm,
-      marginTop: spacing.md,
+      gap:
+        spacing.md,
     },
 
-    savedText: {
-      color: colors.textSecondary,
-      fontSize: typography.caption,
+    moneyCell: {
+      flex: 1,
+      minWidth: 0,
+    },
+
+    moneyDivider: {
+      width: 1,
+      backgroundColor:
+        colors.focus,
+    },
+
+    moneyLabel: {
+      color:
+        colors.accentStrong,
+      fontSize:
+        typography.caption,
       lineHeight:
         typography.lineHeightCaption,
     },
 
-    contributeButton: {
-      minHeight: layout.touchTarget,
-      marginTop: spacing.lg,
+    moneyValue: {
+      marginTop:
+        spacing.xxs,
+      color:
+        colors.textOnPrimary,
+      fontSize:
+        typography.subheading,
+      lineHeight:
+        typography.lineHeightSubheading,
+      fontWeight:
+        typography.weightExtraBold,
+    },
+
+    targetStrip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent:
+        'space-between',
+      gap:
+        spacing.md,
+      paddingTop:
+        spacing.md,
+      borderTopWidth:
+        StyleSheet.hairlineWidth,
+      borderTopColor:
+        colors.focus,
+    },
+
+    targetLabel: {
+      color:
+        colors.accentStrong,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+    },
+
+    targetValue: {
+      flex: 1,
+      color:
+        colors.textOnPrimary,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+      fontWeight:
+        typography.weightBold,
+      textAlign: 'right',
+    },
+
+    noteCard: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap:
+        spacing.sm,
+      padding:
+        spacing.md,
+      borderRadius:
+        radii.lg,
+      backgroundColor:
+        colors.surfaceMuted,
+    },
+
+    noteIcon: {
+      width: 40,
+      height: 40,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: radii.md,
-      backgroundColor: colors.primary,
+      borderRadius:
+        radii.md,
+      backgroundColor:
+        colors.white,
     },
 
-    contributeButtonDisabled: {
-      opacity: 0.5,
+    noteCopy: {
+      flex: 1,
+      gap:
+        spacing.xxs,
     },
 
-    contributeButtonText: {
-      color: colors.textOnPrimary,
-      fontSize: typography.small,
+    noteTitle: {
+      color:
+        colors.text,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
       fontWeight:
         typography.weightBold,
     },
 
-    noteCard: {
-      marginTop: spacing.md,
-      padding: spacing.md,
-      borderRadius: radii.md,
-      backgroundColor:
-        colors.infoSurface,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-
     noteText: {
-      marginTop: spacing.xs,
-      color: colors.textSecondary,
-      fontSize: typography.small,
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.small,
       lineHeight:
         typography.lineHeightSmall,
     },
 
     sectionHeader: {
       flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: spacing.md,
-      marginTop: spacing.xl,
-      marginBottom: spacing.sm,
+      alignItems: 'flex-end',
+      justifyContent:
+        'space-between',
+      gap:
+        spacing.md,
     },
 
     sectionTitle: {
-      color: colors.text,
-      fontSize: typography.subheading,
+      color:
+        colors.text,
+      fontSize:
+        typography.subheading,
       lineHeight:
         typography.lineHeightSubheading,
       fontWeight:
         typography.weightBold,
     },
 
-    sectionMeta: {
-      color: colors.textTertiary,
-      fontSize: typography.caption,
+    sectionBody: {
+      marginTop:
+        spacing.xxs,
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.caption,
       lineHeight:
         typography.lineHeightCaption,
     },
 
-    muted: {
-      color: colors.textTertiary,
-      fontSize: typography.small,
+    sectionMeta: {
+      color:
+        colors.textTertiary,
+      fontSize:
+        typography.caption,
       lineHeight:
-        typography.lineHeightSmall,
-    },
-
-    errorTitle: {
-      color: colors.danger,
-      fontSize: typography.subheading,
-      lineHeight:
-        typography.lineHeightSubheading,
-      fontWeight:
-        typography.weightBold,
+        typography.lineHeightCaption,
     },
 
     emptyHistory: {
-      padding: spacing.lg,
-      borderRadius: radii.lg,
-      backgroundColor: colors.surface,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap:
+        spacing.sm,
+      padding:
+        spacing.md,
+      borderRadius:
+        radii.lg,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor:
+        colors.border,
+      backgroundColor:
+        colors.surface,
       ...elevation.card,
     },
 
+    emptyIcon: {
+      width: 42,
+      height: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius:
+        radii.md,
+      backgroundColor:
+        colors.primarySoft,
+    },
+
+    emptyCopy: {
+      flex: 1,
+      gap:
+        spacing.xxs,
+    },
+
     emptyTitle: {
-      marginBottom: spacing.xs,
-      color: colors.text,
-      fontSize: typography.body,
+      color:
+        colors.text,
+      fontSize:
+        typography.small,
       lineHeight:
-        typography.lineHeightBody,
+        typography.lineHeightSmall,
       fontWeight:
         typography.weightBold,
     },
 
-    historyList: {
-      gap: spacing.sm,
+    emptyBody: {
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+    },
+
+    historyCard: {
+      paddingHorizontal:
+        spacing.md,
+      borderRadius:
+        radii.lg,
+      borderWidth: 1,
+      borderColor:
+        colors.border,
+      backgroundColor:
+        colors.surface,
+      ...elevation.card,
+    },
+
+    divider: {
+      height:
+        StyleSheet.hairlineWidth,
+      backgroundColor:
+        colors.border,
     },
 
     historyRow: {
+      minHeight: 76,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.md,
-      padding: spacing.md,
-      borderRadius: radii.md,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      ...elevation.card,
+      gap:
+        spacing.sm,
+      paddingVertical:
+        spacing.sm,
+    },
+
+    historyIcon: {
+      width: 36,
+      height: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius:
+        radii.md,
+      backgroundColor:
+        colors.successSurface,
     },
 
     historyCopy: {
@@ -784,29 +1135,60 @@ const styles =
     },
 
     historyDate: {
-      color: colors.text,
-      fontSize: typography.small,
+      color:
+        colors.text,
+      fontSize:
+        typography.small,
       lineHeight:
         typography.lineHeightSmall,
       fontWeight:
-        typography.weightSemibold,
+        typography.weightBold,
     },
 
     historyNote: {
-      marginTop: spacing.xxs,
-      color: colors.textSecondary,
-      fontSize: typography.caption,
+      marginTop:
+        spacing.xxs,
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.caption,
       lineHeight:
         typography.lineHeightCaption,
     },
 
     historyAmount: {
-      color: colors.success,
-      fontSize: typography.small,
+      maxWidth: '42%',
+      color:
+        colors.success,
+      fontSize:
+        typography.small,
       lineHeight:
         typography.lineHeightSmall,
       fontWeight:
-        typography.weightBold,
+        typography.weightExtraBold,
       textAlign: 'right',
+    },
+
+    planningNotice: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap:
+        spacing.sm,
+      padding:
+        spacing.md,
+      borderRadius:
+        radii.lg,
+      backgroundColor:
+        colors.primarySoft,
+    },
+
+    planningText: {
+      flex: 1,
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
     },
   });

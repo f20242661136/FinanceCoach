@@ -1,0 +1,6 @@
+env: load .env.local .env
+env: export EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY
+npm notice run finance-coach@1.0.0 lint
+npm notice run expo lint
+npm notice run finance-coach@1.0.0 npx
+npm notice run eslint D:\finance-coach\src --fix=false --cache=true --cache-location=D:\finance-coach\.expo\cache\eslint\

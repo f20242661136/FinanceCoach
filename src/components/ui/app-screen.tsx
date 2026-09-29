@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   View,
+  type ScrollViewProps,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -31,6 +32,13 @@ type AppScreenProps =
     keyboardAware?: boolean;
     contentStyle?:
       StyleProp<ViewStyle>;
+    scrollContentStyle?:
+      StyleProp<ViewStyle>;
+    keyboardShouldPersistTaps?:
+      ScrollViewProps['keyboardShouldPersistTaps'];
+    keyboardDismissMode?:
+      ScrollViewProps['keyboardDismissMode'];
+    testID?: string;
   }>;
 
 export function AppScreen({
@@ -40,6 +48,13 @@ export function AppScreen({
   scroll = true,
   keyboardAware = false,
   contentStyle,
+  scrollContentStyle,
+  keyboardShouldPersistTaps = 'handled',
+  keyboardDismissMode =
+    Platform.OS === 'ios'
+      ? 'interactive'
+      : 'on-drag',
+  testID,
 }: AppScreenProps) {
   const content = (
     <View
@@ -62,29 +77,50 @@ export function AppScreen({
     scroll
       ? (
           <ScrollView
-            contentContainerStyle={
-              styles.scrollContent
+            testID={testID}
+            contentContainerStyle={[
+              styles.scrollContent,
+              scrollContentStyle,
+            ]}
+            keyboardShouldPersistTaps={
+              keyboardShouldPersistTaps
             }
-            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={
+              keyboardDismissMode
+            }
+            automaticallyAdjustKeyboardInsets={
+              Platform.OS === 'ios'
+              && keyboardAware
+            }
             showsVerticalScrollIndicator={false}
           >
             {content}
           </ScrollView>
         )
       : (
-          <View style={styles.flex}>
+          <View
+            testID={testID}
+            style={styles.flex}
+          >
             {content}
           </View>
         );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView
+      edges={[
+        'left',
+        'right',
+        'bottom',
+      ]}
+      style={styles.safeArea}
+    >
       {keyboardAware ? (
         <KeyboardAvoidingView
           behavior={
             Platform.OS === 'ios'
               ? 'padding'
-              : undefined
+              : 'height'
           }
           style={styles.flex}
         >

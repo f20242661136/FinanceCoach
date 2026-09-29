@@ -12,7 +12,7 @@ import {
 
 import {
   colors,
-  layout,
+  elevation,
   radii,
   spacing,
   typography,
@@ -46,7 +46,17 @@ export function AppButton({
   style,
   ...props
 }: AppButtonProps) {
-  const isDisabled = disabled || loading;
+  const isDisabled =
+    Boolean(disabled || loading);
+
+  const usesLightContent =
+    variant === 'primary'
+    || variant === 'danger';
+
+  const contentColor =
+    usesLightContent
+      ? colors.textOnPrimary
+      : colors.primary;
 
   return (
     <Pressable
@@ -58,29 +68,58 @@ export function AppButton({
       disabled={isDisabled}
       style={({ pressed }) => [
         styles.base,
-        fullWidth && styles.fullWidth,
-        variant === 'primary' &&
-          styles.primary,
-        variant === 'secondary' &&
-          styles.secondary,
-        variant === 'ghost' &&
-          styles.ghost,
-        variant === 'danger' &&
-          styles.danger,
-        pressed &&
-          !isDisabled &&
-          variant === 'primary' &&
-          styles.primaryPressed,
-        pressed &&
-          !isDisabled &&
-          variant === 'danger' &&
-          styles.dangerPressed,
-        pressed &&
-          !isDisabled &&
-          variant !== 'primary' &&
-          variant !== 'danger' &&
-          styles.neutralPressed,
-        isDisabled && styles.disabled,
+        fullWidth
+          ? styles.fullWidth
+          : null,
+
+        variant === 'primary'
+          ? styles.primary
+          : null,
+
+        variant === 'secondary'
+          ? styles.secondary
+          : null,
+
+        variant === 'ghost'
+          ? styles.ghost
+          : null,
+
+        variant === 'danger'
+          ? styles.danger
+          : null,
+
+        pressed && !isDisabled
+          ? styles.pressed
+          : null,
+
+        pressed
+        && !isDisabled
+        && variant === 'primary'
+          ? styles.primaryPressed
+          : null,
+
+        pressed
+        && !isDisabled
+        && variant === 'secondary'
+          ? styles.secondaryPressed
+          : null,
+
+        pressed
+        && !isDisabled
+        && variant === 'ghost'
+          ? styles.ghostPressed
+          : null,
+
+        pressed
+        && !isDisabled
+        && variant === 'danger'
+          ? styles.dangerPressed
+          : null,
+
+        isDisabled
+          ? styles.disabled
+          : null,
+
         style,
       ]}
       {...props}
@@ -88,35 +127,25 @@ export function AppButton({
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={
-            variant === 'primary'
-              || variant === 'danger'
-              ? colors.textOnPrimary
-              : colors.primary
-          }
+          color={contentColor}
         />
       ) : (
         <>
           {icon ? (
             <Ionicons
               name={icon}
-              size={18}
-              color={
-                variant === 'primary'
-                  || variant === 'danger'
-                  ? colors.textOnPrimary
-                  : colors.primary
-              }
+              size={19}
+              color={contentColor}
             />
           ) : null}
 
           <Text
+            numberOfLines={2}
             style={[
               styles.label,
-              variant === 'primary'
-                || variant === 'danger'
-                ? styles.primaryLabel
-                : styles.neutralLabel,
+              usesLightContent
+                ? styles.lightLabel
+                : styles.primaryLabel,
             ]}
           >
             {label}
@@ -129,15 +158,15 @@ export function AppButton({
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: layout.touchTarget,
+    minHeight: 52,
     paddingHorizontal: spacing.lg,
-    paddingVertical: 14,
+    paddingVertical: 13,
     borderRadius: radii.md,
+    borderWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
-    borderWidth: 1,
   },
 
   fullWidth: {
@@ -146,51 +175,68 @@ const styles = StyleSheet.create({
 
   primary: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    ...elevation.card,
   },
 
   primaryPressed: {
     backgroundColor: colors.primaryPressed,
-    borderColor: colors.primaryPressed,
   },
 
   secondary: {
     backgroundColor: colors.surface,
+    borderWidth: 1,
     borderColor: colors.borderStrong,
+    ...elevation.card,
+  },
+
+  secondaryPressed: {
+    backgroundColor: colors.primarySoft,
+  },
+
+  ghost: {
+    backgroundColor: colors.primarySoft,
+  },
+
+  ghostPressed: {
+    backgroundColor: colors.accent,
+    borderColor: colors.primary,
   },
 
   danger: {
     backgroundColor: colors.danger,
-    borderColor: colors.danger,
+    ...elevation.card,
   },
 
   dangerPressed: {
-    opacity: 0.86,
+    opacity: 0.9,
   },
 
-  ghost: {
-    backgroundColor: 'transparent',
-    borderColor: 'transparent',
-  },
-
-  neutralPressed: {
-    backgroundColor: colors.surfaceMuted,
+  pressed: {
+    transform: [
+      {
+        scale: 0.985,
+      },
+    ],
   },
 
   disabled: {
-    opacity: 0.55,
+    opacity: 0.5,
   },
 
   label: {
+    flexShrink: 1,
+    color: colors.text,
     fontSize: typography.body,
-    fontWeight: '700',
+    lineHeight: typography.lineHeightBody,
+    fontWeight: typography.weightSemibold,
+    textAlign: 'center',
+  },
+
+  lightLabel: {
+    color: colors.textOnPrimary,
   },
 
   primaryLabel: {
-    color: colors.white,
-  },
-
-  neutralLabel: {
     color: colors.primary,
   },
 });

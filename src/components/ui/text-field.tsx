@@ -1,4 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useState } from 'react';
+
 import {
   Pressable,
   StyleSheet,
@@ -7,7 +9,6 @@ import {
   View,
   type TextInputProps,
 } from 'react-native';
-import { useState } from 'react';
 
 import {
   colors,
@@ -17,47 +18,90 @@ import {
   typography,
 } from '@/design/tokens';
 
-type TextFieldProps = TextInputProps & {
-  label: string;
-  error?: string;
-  helperText?: string;
-  secure?: boolean;
-};
+type TextFieldProps =
+  TextInputProps & {
+    label: string;
+    error?: string;
+    helperText?: string;
+    secure?: boolean;
+    required?: boolean;
+  };
 
 export function TextField({
   label,
   error,
   helperText,
   secure = false,
+  required = false,
+  style,
+  accessibilityLabel,
+  accessibilityState,
+  editable = true,
+  multiline = false,
   ...props
 }: TextFieldProps) {
-  const [showSecureValue, setShowSecureValue] =
-    useState(false);
+  const [
+    showSecureValue,
+    setShowSecureValue,
+  ] = useState(false);
 
   const isSecure =
     secure && !showSecureValue;
+
+  const inputAccessibilityLabel =
+    accessibilityLabel
+    ?? (
+      required
+        ? `${label}, required`
+        : label
+    );
 
   return (
     <View style={styles.wrapper}>
       <Text style={styles.label}>
         {label}
+        {required ? (
+          <Text style={styles.required}>
+            {' *'}
+          </Text>
+        ) : null}
       </Text>
 
       <View
         style={[
           styles.fieldContainer,
-          error && styles.fieldError,
+          multiline
+            && styles.multilineContainer,
+          error
+            && styles.fieldError,
+          !editable
+            && styles.fieldDisabled,
         ]}
       >
         <TextInput
-          accessibilityLabel={label}
+          {...props}
+          accessibilityLabel={
+            inputAccessibilityLabel
+          }
+          accessibilityState={{
+            ...accessibilityState,
+            disabled: !editable,
+          }}
+          editable={editable}
+          multiline={multiline}
           placeholderTextColor={
             colors.textTertiary
           }
-          selectionColor={colors.focus}
+          selectionColor={
+            colors.focus
+          }
           secureTextEntry={isSecure}
-          style={styles.input}
-          {...props}
+          style={[
+            styles.input,
+            multiline
+              && styles.multilineInput,
+            style,
+          ]}
         />
 
         {secure ? (
@@ -68,10 +112,14 @@ export function TextField({
                 ? 'Hide password'
                 : 'Show password'
             }
+            accessibilityState={{
+              disabled: !editable,
+            }}
+            disabled={!editable}
             hitSlop={8}
             onPress={() =>
               setShowSecureValue(
-                (current) => !current,
+                current => !current,
               )
             }
             style={styles.iconButton}
@@ -83,7 +131,11 @@ export function TextField({
                   : 'eye-outline'
               }
               size={21}
-              color={colors.textSecondary}
+              color={
+                editable
+                  ? colors.textSecondary
+                  : colors.textTertiary
+              }
             />
           </Pressable>
         ) : null}
@@ -111,49 +163,94 @@ const styles = StyleSheet.create({
   },
 
   label: {
-    color: colors.text,
-    fontSize: typography.small,
-    fontWeight: '700',
+    color:
+      colors.text,
+    fontSize:
+      typography.small,
+    lineHeight:
+      typography.lineHeightSmall,
+    fontWeight:
+      typography.weightBold,
+  },
+
+  required: {
+    color:
+      colors.danger,
   },
 
   fieldContainer: {
-    minHeight: layout.touchTarget + 6,
+    minHeight:
+      layout.touchTarget + 6,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor:
+      colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
+    borderColor:
+      colors.border,
+    borderRadius:
+      radii.md,
+  },
+
+  multilineContainer: {
+    alignItems: 'flex-start',
   },
 
   fieldError: {
-    borderColor: colors.danger,
+    borderColor:
+      colors.danger,
+  },
+
+  fieldDisabled: {
+    backgroundColor:
+      colors.surfaceMuted,
   },
 
   input: {
     flex: 1,
-    minHeight: layout.touchTarget,
-    paddingHorizontal: spacing.md,
-    color: colors.text,
-    fontSize: typography.body,
+    minHeight:
+      layout.touchTarget,
+    paddingHorizontal:
+      spacing.md,
+    paddingVertical:
+      spacing.sm,
+    color:
+      colors.text,
+    fontSize:
+      typography.body,
+    lineHeight:
+      typography.lineHeightBody,
+  },
+
+  multilineInput: {
+    minHeight: 108,
+    textAlignVertical: 'top',
   },
 
   iconButton: {
-    minWidth: layout.touchTarget,
-    minHeight: layout.touchTarget,
+    minWidth:
+      layout.touchTarget,
+    minHeight:
+      layout.touchTarget,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   error: {
-    color: colors.danger,
-    fontSize: typography.caption,
-    lineHeight: 18,
+    color:
+      colors.danger,
+    fontSize:
+      typography.caption,
+    lineHeight:
+      typography.lineHeightCaption,
   },
 
   helper: {
-    color: colors.textSecondary,
-    fontSize: typography.caption,
-    lineHeight: 18,
+    color:
+      colors.textSecondary,
+    fontSize:
+      typography.caption,
+    lineHeight:
+      typography.lineHeightCaption,
   },
 });

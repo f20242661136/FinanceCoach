@@ -1,5 +1,7 @@
 import {
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -93,12 +95,20 @@ export function AiChatScreen() {
       conversationId?:
         | string
         | string[];
+      initialPrompt?:
+        | string
+        | string[];
     }>();
 
   const conversationId =
     firstParam(
       params.conversationId,
     );
+
+  const initialPrompt =
+    firstParam(
+      params.initialPrompt,
+    ).trim();
 
   const timezone =
     useMemo(() => deviceTimezone(), []);
@@ -119,6 +129,31 @@ export function AiChatScreen() {
     setDraft,
   ] =
     useState('');
+
+  const autoSentPrompt =
+    useRef(false);
+
+  useEffect(() => {
+    if (
+      !conversationId
+      || !initialPrompt
+      || autoSentPrompt.current
+    ) {
+      return;
+    }
+
+    autoSentPrompt.current = true;
+
+    void sendMutation
+      .mutateAsync(initialPrompt)
+      .catch(() => {
+        setDraft(initialPrompt);
+      });
+  }, [
+    conversationId,
+    initialPrompt,
+    sendMutation,
+  ]);
 
 
   async function send() {

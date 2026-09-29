@@ -1,3 +1,5 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+
 import {
   useMemo,
 } from 'react';
@@ -12,12 +14,29 @@ import {
 } from 'react-native';
 
 import {
+  AppButton,
+} from '@/components/ui/app-button';
+
+import {
+  InlineNotice,
+} from '@/components/ui/inline-notice';
+
+import {
+  StatePanel,
+} from '@/components/ui/state-panel';
+
+import {
   colors,
   elevation,
   layout,
   radii,
+  spacing,
   typography,
 } from '@/design/tokens';
+
+import {
+  toUserFacingError,
+} from '@/lib/user-facing-error';
 
 import {
   gamificationEventLabel,
@@ -29,7 +48,6 @@ import {
   useRefreshGamificationChallenge,
   useStartGamificationChallenge,
 } from './gamification-query';
-
 
 function deviceTimezone(): string {
   try {
@@ -43,7 +61,6 @@ function deviceTimezone(): string {
     return 'UTC';
   }
 }
-
 
 function progressPercent(
   current: bigint,
@@ -84,10 +101,44 @@ function progressPercent(
   );
 }
 
+function levelProgressWidth(
+  value: number,
+): `${number}%` {
+  return `${value}%`;
+}
+
+function friendlyDate(
+  value: string,
+): string {
+  const parsed =
+    new Date(
+      `${value}T00:00:00`,
+    );
+
+  if (
+    Number.isNaN(
+      parsed.getTime(),
+    )
+  ) {
+    return value;
+  }
+
+  return parsed.toLocaleDateString(
+    undefined,
+    {
+      month: 'short',
+      day: 'numeric',
+    },
+  );
+}
 
 export function GamificationScreen() {
   const timezone =
-    useMemo(() => deviceTimezone(), []);
+    useMemo(
+      () =>
+        deviceTimezone(),
+      [],
+    );
 
   const query =
     useGamificationSummary(
@@ -107,83 +158,55 @@ export function GamificationScreen() {
   const summary =
     query.data;
 
-
   if (
     query.isLoading
     && !summary
   ) {
     return (
-      <View
-        style={
-          styles.centered
-        }
-      >
-        <Text
-          style={
-            styles.muted
-          }
-        >
-          Loading progress…
-        </Text>
+      <View style={styles.centered}>
+        <StatePanel
+          loading
+          title="Loading progress"
+          description="Checking your verified habits, streaks, challenges, and badges."
+        />
       </View>
     );
   }
-
 
   if (
     query.error
     && !summary
   ) {
     return (
-      <View
-        style={
-          styles.centered
-        }
-      >
-        <Text
-          style={
-            styles.errorTitle
+      <View style={styles.centered}>
+        <StatePanel
+          title="Progress unavailable"
+          description={
+            toUserFacingError(
+              query.error,
+              'generic',
+            )
           }
-        >
-          Progress unavailable
-        </Text>
-
-        <Text
-          style={
-            styles.muted
+          icon="alert-circle-outline"
+          tone="danger"
+          action={
+            <AppButton
+              label="Try again"
+              variant="secondary"
+              fullWidth={false}
+              onPress={() => {
+                void query.refetch();
+              }}
+            />
           }
-        >
-          {query.error instanceof Error
-            ? query.error.message
-            : 'Please try again.'}
-        </Text>
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => {
-            void query.refetch();
-          }}
-          style={
-            styles.retryButton
-          }
-        >
-          <Text
-            style={
-              styles.retryButtonText
-            }
-          >
-            Retry
-          </Text>
-        </Pressable>
+        />
       </View>
     );
   }
 
-
   if (!summary) {
     return null;
   }
-
 
   const totalPoints =
     BigInt(
@@ -209,32 +232,38 @@ export function GamificationScreen() {
       nextMinimum,
     );
 
-
   const activeChallengeByDefinition =
     new Map(
       summary.my_challenges
         .filter(
-          (challenge) =>
-            challenge.status ===
-              'active',
+          challenge =>
+            challenge.status
+            === 'active',
         )
         .map(
-          (challenge) => [
+          challenge => [
             challenge.challenge_id,
             challenge,
           ],
         ),
     );
 
+  const activeChallengeCount =
+    summary.my_challenges
+      .filter(
+        challenge =>
+          challenge.status
+          === 'active',
+      )
+      .length;
 
   return (
     <ScrollView
-      style={
-        styles.screen
-      }
+      style={styles.screen}
       contentContainerStyle={
         styles.content
       }
+      showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
           refreshing={
@@ -246,203 +275,207 @@ export function GamificationScreen() {
         />
       }
     >
-      <Text
-        style={
-          styles.eyebrow
-        }
-      >
-        PROGRESS
-      </Text>
+      <View style={styles.header}>
+        <Text style={styles.eyebrow}>
+          PROGRESS
+        </Text>
 
-      <Text
-        style={
-          styles.title
-        }
-      >
-        Build better money habits
-      </Text>
-
-      <Text
-        style={
-          styles.subtitle
-        }
-      >
-        Points, streaks and challenges reflect verified activity. They are designed to encourage consistency, not financial pressure.
-      </Text>
-
-
-      <View
-        style={
-          styles.levelCard
-        }
-      >
-        <View
-          style={
-            styles.levelHeader
-          }
+        <Text
+          accessibilityRole="header"
+          style={styles.title}
         >
-          <View>
-            <Text
-              style={
-                styles.levelLabel
-              }
-            >
-              LEVEL {summary.level}
-            </Text>
+          Build better money habits
+        </Text>
 
-            <Text
-              style={
-                styles.levelName
-              }
-            >
-              {summary.level_name}
-            </Text>
+        <Text style={styles.subtitle}>
+          Points, streaks, and challenges reflect verified activity. They are designed to encourage consistency, not financial pressure.
+        </Text>
+      </View>
+
+      {startMutation.error ? (
+        <InlineNotice
+          tone="error"
+          message={
+            toUserFacingError(
+              startMutation.error,
+              'generic',
+            )
+          }
+        />
+      ) : null}
+
+      {refreshMutation.error ? (
+        <InlineNotice
+          tone="error"
+          message={
+            toUserFacingError(
+              refreshMutation.error,
+              'generic',
+            )
+          }
+        />
+      ) : null}
+
+      <View style={styles.levelCard}>
+        <View style={styles.levelTop}>
+          <View style={styles.levelIdentity}>
+            <View style={styles.levelIcon}>
+              <Ionicons
+                name="trophy-outline"
+                size={24}
+                color={
+                  colors.textOnPrimary
+                }
+              />
+            </View>
+
+            <View>
+              <Text style={styles.levelLabel}>
+                LEVEL {summary.level}
+              </Text>
+
+              <Text style={styles.levelName}>
+                {summary.level_name}
+              </Text>
+            </View>
           </View>
 
-          <View
-            style={
-              styles.pointsBlock
-            }
-          >
-            <Text
-              style={
-                styles.pointsValue
-              }
-            >
+          <View style={styles.pointsBlock}>
+            <Text style={styles.pointsValue}>
               {summary.total_points}
             </Text>
 
-            <Text
-              style={
-                styles.pointsLabel
-              }
-            >
+            <Text style={styles.pointsLabel}>
               points
             </Text>
           </View>
         </View>
 
+        <View style={styles.progressArea}>
+          <View style={styles.progressTrack}>
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  width:
+                    levelProgressWidth(
+                      levelProgress,
+                    ),
+                },
+              ]}
+            />
+          </View>
 
-        <View
-          style={
-            styles.progressTrack
-          }
-        >
-          <View
-            style={[
-              styles.progressFill,
+          <Text style={styles.levelMeta}>
+            {summary.next_level
+              ? `${
+                  summary.next_level_minimum_points
+                } points for Level ${
+                  summary.next_level
+                } - ${
+                  summary.next_level_name
+                }`
+              : 'Highest configured level reached'}
+          </Text>
+        </View>
+      </View>
 
-              {
-                width:
-                  `${levelProgress}%`,
-              },
-            ]}
-          />
+      <View style={styles.summaryStrip}>
+        <View style={styles.summaryItem}>
+          <Text style={styles.summaryValue}>
+            {activeChallengeCount}
+          </Text>
+
+          <Text style={styles.summaryLabel}>
+            Active
+          </Text>
         </View>
 
+        <View style={styles.summaryDivider} />
 
-        <Text
-          style={
-            styles.levelMeta
-          }
-        >
-          {summary.next_level
-            ? `${
-                summary.next_level_minimum_points
-              } points for Level ${
-                summary.next_level
-              } · ${
-                summary.next_level_name
-              }`
-            : 'Highest configured level reached'}
+        <View style={styles.summaryItem}>
+          <Text style={styles.summaryValue}>
+            {summary.streaks.length}
+          </Text>
+
+          <Text style={styles.summaryLabel}>
+            Streaks
+          </Text>
+        </View>
+
+        <View style={styles.summaryDivider} />
+
+        <View style={styles.summaryItem}>
+          <Text style={styles.summaryValue}>
+            {summary.badges.length}
+          </Text>
+
+          <Text style={styles.summaryLabel}>
+            Badges
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.sectionHeading}>
+        <Text style={styles.sectionTitle}>
+          Streaks
+        </Text>
+
+        <Text style={styles.sectionMeta}>
+          Consistency over intensity
         </Text>
       </View>
 
-
-      <Text
-        style={
-          styles.sectionTitle
-        }
-      >
-        Streaks
-      </Text>
-
-      <View
-        style={
-          styles.streakGrid
-        }
-      >
+      <View style={styles.streakGrid}>
         {summary.streaks.map(
-          (streak) => (
+          streak => (
             <View
               key={
                 streak.streak_type
               }
-              style={
-                styles.streakCard
-              }
+              style={styles.streakCard}
             >
-              <Text
-                style={
-                  styles.streakName
-                }
-              >
+              <View style={styles.streakIcon}>
+                <Ionicons
+                  name="flame-outline"
+                  size={18}
+                  color={
+                    colors.primary
+                  }
+                />
+              </View>
+
+              <Text style={styles.streakName}>
                 {gamificationStreakLabel(
                   streak.streak_type,
                 )}
               </Text>
 
-              <Text
-                style={
-                  styles.streakValue
-                }
-              >
+              <Text style={styles.streakValue}>
                 {streak.current_count}
               </Text>
 
-              <Text
-                style={
-                  styles.streakMeta
-                }
-              >
-                current · best {streak.best_count}
+              <Text style={styles.streakMeta}>
+                Best {streak.best_count}
               </Text>
             </View>
           ),
         )}
       </View>
 
-
-      <View
-        style={
-          styles.sectionHeader
-        }
-      >
-        <Text
-          style={
-            styles.sectionTitle
-          }
-        >
+      <View style={styles.sectionHeading}>
+        <Text style={styles.sectionTitle}>
           Challenges
         </Text>
 
-        <Text
-          style={
-            styles.sectionMeta
-          }
-        >
+        <Text style={styles.sectionMeta}>
           Verified from app data
         </Text>
       </View>
 
-
-      <View
-        style={
-          styles.challengeList
-        }
-      >
+      <View style={styles.challengeList}>
         {summary.available_challenges.map(
-          (challenge) => {
+          challenge => {
             const active =
               activeChallengeByDefinition
                 .get(
@@ -452,154 +485,148 @@ export function GamificationScreen() {
             const completed =
               summary.my_challenges
                 .find(
-                  (item) =>
-                    item.challenge_id ===
-                      challenge.id
-                    &&
-                    item.status ===
-                      'completed',
+                  item =>
+                    item.challenge_id
+                      === challenge.id
+                    && item.status
+                      === 'completed',
                 );
-
 
             return (
               <View
                 key={
                   challenge.id
                 }
-                style={
-                  styles.challengeCard
-                }
+                style={[
+                  styles.challengeCard,
+                  completed
+                    ? styles.challengeCardCompleted
+                    : null,
+                ]}
               >
-                <View
-                  style={
-                    styles.challengeHeader
-                  }
-                >
-                  <View
-                    style={
-                      styles.challengeCopy
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.challengeTitle
-                      }
+                <View style={styles.challengeHeader}>
+                  <View style={styles.challengeIdentity}>
+                    <View
+                      style={[
+                        styles.challengeIcon,
+                        completed
+                          ? styles.challengeIconCompleted
+                          : null,
+                      ]}
                     >
-                      {challenge.title}
-                    </Text>
+                      <Ionicons
+                        name={
+                          completed
+                            ? 'checkmark-outline'
+                            : 'flag-outline'
+                        }
+                        size={19}
+                        color={
+                          completed
+                            ? colors.success
+                            : colors.primary
+                        }
+                      />
+                    </View>
 
-                    <Text
-                      style={
-                        styles.challengeCadence
-                      }
-                    >
-                      {challenge.cadence ===
-                        'daily'
-                        ? 'Daily'
-                        : 'Weekly'}
-                      {' · +'}
-                      {challenge.points_reward}
-                      {' points'}
-                    </Text>
+                    <View style={styles.challengeCopy}>
+                      <Text style={styles.challengeTitle}>
+                        {challenge.title}
+                      </Text>
+
+                      <Text style={styles.challengeCadence}>
+                        {challenge.cadence
+                          === 'daily'
+                          ? 'Daily'
+                          : 'Weekly'}
+                        {'  |  +'}
+                        {challenge.points_reward}
+                        {' points'}
+                      </Text>
+                    </View>
                   </View>
 
                   {challenge.is_premium ? (
-                    <View
-                      style={
-                        styles.premiumPill
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.premiumText
-                        }
-                      >
+                    <View style={styles.premiumPill}>
+                      <Text style={styles.premiumText}>
                         PRO
                       </Text>
                     </View>
                   ) : null}
                 </View>
 
-
-                <Text
-                  style={
-                    styles.challengeDescription
-                  }
-                >
+                <Text style={styles.challengeDescription}>
                   {challenge.description}
                 </Text>
 
-
                 {active ? (
-                  <>
-                    <View
-                      style={
-                        styles.challengeProgressRow
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.challengeProgress
-                        }
-                      >
-                        {active.progress_count}
-                        /
-                        {active.target_count}
-                      </Text>
+                  <View style={styles.challengeActive}>
+                    <View style={styles.challengeProgressRow}>
+                      <View>
+                        <Text style={styles.challengeProgressLabel}>
+                          Progress
+                        </Text>
 
-                      <Text
-                        style={
-                          styles.challengePeriod
-                        }
-                      >
-                        {active.period_start}
-                        {' → '}
-                        {active.period_end}
+                        <Text style={styles.challengeProgress}>
+                          {active.progress_count}
+                          /
+                          {active.target_count}
+                        </Text>
+                      </View>
+
+                      <Text style={styles.challengePeriod}>
+                        {friendlyDate(
+                          active.period_start,
+                        )}
+                        {' - '}
+                        {friendlyDate(
+                          active.period_end,
+                        )}
                       </Text>
                     </View>
 
-                    <Pressable
-                      accessibilityRole="button"
-                      disabled={
+                    <AppButton
+                      label={
+                        refreshMutation.isPending
+                          ? 'Checking...'
+                          : 'Check progress'
+                      }
+                      variant="secondary"
+                      loading={
                         refreshMutation.isPending
                       }
+                      icon="refresh-outline"
                       onPress={() => {
                         void refreshMutation
                           .mutateAsync(
                             active.id,
                           );
                       }}
-                      style={
-                        styles.secondaryAction
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.secondaryActionText
-                        }
-                      >
-                        Check progress
-                      </Text>
-                    </Pressable>
-                  </>
+                    />
+                  </View>
                 ) : completed ? (
-                  <View
-                    style={
-                      styles.completedBanner
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.completedText
+                  <View style={styles.completedBanner}>
+                    <Ionicons
+                      name="checkmark-circle-outline"
+                      size={18}
+                      color={
+                        colors.success
                       }
-                    >
+                    />
+
+                    <Text style={styles.completedText}>
                       Completed
                     </Text>
                   </View>
                 ) : (
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={
+                  <AppButton
+                    label={
+                      startMutation.isPending
+                        ? 'Starting...'
+                        : 'Start challenge'
+                    }
+                    icon="play-outline"
+                    loading={
                       startMutation.isPending
                     }
                     onPress={() => {
@@ -608,18 +635,7 @@ export function GamificationScreen() {
                           challenge.id,
                         );
                     }}
-                    style={
-                      styles.primaryAction
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.primaryActionText
-                      }
-                    >
-                      Start challenge
-                    </Text>
-                  </Pressable>
+                  />
                 )}
               </View>
             );
@@ -627,100 +643,64 @@ export function GamificationScreen() {
         )}
       </View>
 
-
-      <View
-        style={
-          styles.sectionHeader
-        }
-      >
-        <Text
-          style={
-            styles.sectionTitle
-          }
-        >
+      <View style={styles.sectionHeading}>
+        <Text style={styles.sectionTitle}>
           Badges
         </Text>
 
-        <Text
-          style={
-            styles.sectionMeta
-          }
-        >
+        <Text style={styles.sectionMeta}>
           {summary.badges.length} earned
         </Text>
       </View>
 
-
       {summary.badges.length === 0 ? (
-        <View
-          style={
-            styles.emptyCard
-          }
-        >
-          <Text
-            style={
-              styles.emptyTitle
-            }
-          >
-            Your first badge is ahead
-          </Text>
+        <View style={styles.emptyCard}>
+          <View style={styles.emptyIcon}>
+            <Ionicons
+              name="ribbon-outline"
+              size={22}
+              color={
+                colors.primary
+              }
+            />
+          </View>
 
-          <Text
-            style={
-              styles.emptyBody
-            }
-          >
-            Keep using the app normally. Badges are awarded from verified activity.
-          </Text>
+          <View style={styles.emptyCopy}>
+            <Text style={styles.emptyTitle}>
+              Your first badge is ahead
+            </Text>
+
+            <Text style={styles.emptyBody}>
+              Keep using Finance Coach normally. Badges come from verified activity, not from spending more.
+            </Text>
+          </View>
         </View>
       ) : (
-        <View
-          style={
-            styles.badgeList
-          }
-        >
+        <View style={styles.badgeList}>
           {summary.badges.map(
-            (badge) => (
+            badge => (
               <View
                 key={
                   badge.id
                 }
-                style={
-                  styles.badgeCard
-                }
+                style={styles.badgeCard}
               >
-                <View
-                  style={
-                    styles.badgeIcon
-                  }
-                >
-                  <Text
-                    style={
-                      styles.badgeIconText
+                <View style={styles.badgeIcon}>
+                  <Ionicons
+                    name="ribbon-outline"
+                    size={20}
+                    color={
+                      colors.success
                     }
-                  >
-                    ✓
-                  </Text>
+                  />
                 </View>
 
-                <View
-                  style={
-                    styles.badgeCopy
-                  }
-                >
-                  <Text
-                    style={
-                      styles.badgeName
-                    }
-                  >
+                <View style={styles.badgeCopy}>
+                  <Text style={styles.badgeName}>
                     {badge.name}
                   </Text>
 
-                  <Text
-                    style={
-                      styles.badgeDescription
-                    }
-                  >
+                  <Text style={styles.badgeDescription}>
                     {badge.description}
                   </Text>
                 </View>
@@ -730,228 +710,250 @@ export function GamificationScreen() {
         </View>
       )}
 
-
-      <View
-        style={
-          styles.sectionHeader
-        }
-      >
-        <Text
-          style={
-            styles.sectionTitle
-          }
-        >
+      <View style={styles.sectionHeading}>
+        <Text style={styles.sectionTitle}>
           Recent points
         </Text>
 
-        <Text
-          style={
-            styles.sectionMeta
-          }
-        >
-          Event based
+        <Text style={styles.sectionMeta}>
+          Verified events
         </Text>
       </View>
 
+      {summary.recent_point_events.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <View style={styles.emptyIcon}>
+            <Ionicons
+              name="star-outline"
+              size={22}
+              color={
+                colors.primary
+              }
+            />
+          </View>
 
-      {summary.recent_point_events.length ===
-        0 ? (
-        <View
-          style={
-            styles.emptyCard
-          }
-        >
-          <Text
-            style={
-              styles.emptyBody
-            }
-          >
-            Point events will appear as you use Finance Coach.
-          </Text>
+          <View style={styles.emptyCopy}>
+            <Text style={styles.emptyTitle}>
+              No point events yet
+            </Text>
+
+            <Text style={styles.emptyBody}>
+              Point events appear as you use Finance Coach and complete verified activities.
+            </Text>
+          </View>
         </View>
       ) : (
-        <View
-          style={
-            styles.eventList
-          }
-        >
+        <View style={styles.eventList}>
           {summary.recent_point_events.map(
-            (event) => (
+            (
+              event,
+              index,
+            ) => (
               <View
                 key={
                   event.id
                 }
-                style={
-                  styles.eventRow
-                }
               >
-                <View
-                  style={
-                    styles.eventCopy
-                  }
-                >
-                  <Text
-                    style={
-                      styles.eventName
-                    }
-                  >
-                    {gamificationEventLabel(
-                      event.event_type,
-                    )}
-                  </Text>
+                {index > 0 ? (
+                  <View style={styles.divider} />
+                ) : null}
 
-                  <Text
-                    style={
-                      styles.eventDate
-                    }
-                  >
-                    {new Date(
-                      event.created_at,
-                    ).toLocaleDateString()}
+                <View style={styles.eventRow}>
+                  <View style={styles.eventIcon}>
+                    <Ionicons
+                      name="star-outline"
+                      size={17}
+                      color={
+                        colors.primary
+                      }
+                    />
+                  </View>
+
+                  <View style={styles.eventCopy}>
+                    <Text style={styles.eventName}>
+                      {gamificationEventLabel(
+                        event.event_type,
+                      )}
+                    </Text>
+
+                    <Text style={styles.eventDate}>
+                      {new Date(
+                        event.created_at,
+                      ).toLocaleDateString()}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.eventPoints}>
+                    +{event.points}
                   </Text>
                 </View>
-
-                <Text
-                  style={
-                    styles.eventPoints
-                  }
-                >
-                  +{event.points}
-                </Text>
               </View>
             ),
           )}
         </View>
       )}
 
+      <View style={styles.noteCard}>
+        <View style={styles.noteIcon}>
+          <Ionicons
+            name="heart-outline"
+            size={20}
+            color={
+              colors.primary
+            }
+          />
+        </View>
 
-      <View
-        style={
-          styles.noteCard
-        }
-      >
-        <Text
-          style={
-            styles.noteTitle
-          }
-        >
-          Healthy motivation
-        </Text>
+        <View style={styles.noteCopy}>
+          <Text style={styles.noteTitle}>
+            Healthy motivation
+          </Text>
 
-        <Text
-          style={
-            styles.noteBody
-          }
-        >
-          Finance Coach does not reward spending more money. Progress is tied to useful behaviors such as recording, planning, saving and completing verified challenges.
-        </Text>
+          <Text style={styles.noteBody}>
+            Finance Coach does not reward spending more money. Progress is tied to useful behaviors such as recording, planning, saving, and completing verified challenges.
+          </Text>
+        </View>
       </View>
     </ScrollView>
   );
 }
 
-
 const styles =
   StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: colors.background,
-    },
-
-    content: {
-      width: '100%',
-      maxWidth: layout.contentMaxWidth,
-      alignSelf: 'center',
-      paddingHorizontal: layout.screenHorizontalPadding,
-      paddingTop: 22,
-      paddingBottom: 120,
+      backgroundColor:
+        colors.background,
     },
 
     centered: {
       flex: 1,
-      alignItems: 'center',
       justifyContent: 'center',
-      padding: 24,
-      backgroundColor: colors.background,
+      paddingHorizontal:
+        layout.screenHorizontalPadding,
+      backgroundColor:
+        colors.background,
     },
 
-    muted: {
-      color: colors.textSecondary,
-      fontSize: typography.small,
-      lineHeight: 19,
-      textAlign: 'center',
+    content: {
+      flexGrow: 1,
+      width: '100%',
+      maxWidth:
+        layout.contentMaxWidth,
+      alignSelf: 'center',
+      gap:
+        spacing.lg,
+      paddingHorizontal:
+        layout.screenHorizontalPadding,
+      paddingTop:
+        spacing.lg,
+      paddingBottom:
+        spacing.xl,
     },
 
-    errorTitle: {
-      marginBottom: 5,
-      color: colors.danger,
-      fontSize: typography.subheading,
-      fontWeight: typography.weightBold,
-    },
-
-    retryButton: {
-      marginTop: 14,
-      paddingHorizontal: 15,
-      paddingVertical: 10,
-      borderRadius: radii.sm,
-      backgroundColor: colors.primary,
-    },
-
-    retryButtonText: {
-      color: colors.textOnPrimary,
-      fontSize: typography.caption,
-      fontWeight: typography.weightBold,
+    header: {
+      gap:
+        spacing.xs,
     },
 
     eyebrow: {
-      color: colors.primary,
-      fontSize: typography.caption,
-      fontWeight: typography.weightBold,
-      letterSpacing: 1.4,
+      color:
+        colors.primary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+      fontWeight:
+        typography.weightExtraBold,
+      letterSpacing: 1.1,
     },
 
     title: {
-      marginTop: 8,
-      color: colors.text,
-      fontSize: typography.title,
-      lineHeight: 35,
-      fontWeight: typography.weightBold,
+      color:
+        colors.text,
+      fontSize:
+        typography.title,
+      lineHeight:
+        typography.lineHeightTitle,
+      fontWeight:
+        typography.weightExtraBold,
+      letterSpacing: -0.6,
     },
 
     subtitle: {
-      marginTop: 8,
-      color: colors.textSecondary,
-      fontSize: typography.small,
-      lineHeight: 21,
+      maxWidth: 460,
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
     },
 
     levelCard: {
-      marginTop: 20,
-      padding: 18,
-      borderRadius: radii.lg,
-      backgroundColor: colors.text,
-      ...elevation.card
+      gap:
+        spacing.lg,
+      padding:
+        spacing.lg,
+      borderRadius:
+        radii.xl,
+      backgroundColor:
+        colors.primary,
+      ...elevation.floating,
     },
 
-    levelHeader: {
+    levelTop: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'flex-start',
-      gap: 16,
+      justifyContent:
+        'space-between',
+      gap:
+        spacing.md,
+    },
+
+    levelIdentity: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap:
+        spacing.sm,
+    },
+
+    levelIcon: {
+      width: 46,
+      height: 46,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius:
+        radii.lg,
+      backgroundColor:
+        colors.focus,
     },
 
     levelLabel: {
-      color: colors.accentStrong,
-      fontSize: typography.caption,
-      fontWeight: typography.weightBold,
+      color:
+        colors.accentStrong,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+      fontWeight:
+        typography.weightBold,
       letterSpacing: 1,
     },
 
     levelName: {
-      marginTop: 5,
-      color: colors.textOnPrimary,
-      fontSize: typography.heading,
-      fontWeight: typography.weightBold,
+      marginTop:
+        spacing.xxs,
+      color:
+        colors.textOnPrimary,
+      fontSize:
+        typography.heading,
+      lineHeight:
+        typography.lineHeightHeading,
+      fontWeight:
+        typography.weightExtraBold,
     },
 
     pointsBlock: {
@@ -959,346 +961,637 @@ const styles =
     },
 
     pointsValue: {
-      color: colors.textOnPrimary,
-      fontSize: typography.heading,
-      fontWeight: typography.weightBold,
+      color:
+        colors.textOnPrimary,
+      fontSize:
+        typography.heading,
+      lineHeight:
+        typography.lineHeightHeading,
+      fontWeight:
+        typography.weightExtraBold,
     },
 
     pointsLabel: {
-      marginTop: 1,
-      color: colors.textTertiary,
-      fontSize: typography.caption,
+      color:
+        colors.accentStrong,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+    },
+
+    progressArea: {
+      gap:
+        spacing.xs,
     },
 
     progressTrack: {
-      height: 7,
-      marginTop: 19,
+      height: 9,
       overflow: 'hidden',
-      borderRadius: radii.pill,
-      backgroundColor: colors.borderStrong,
+      borderRadius:
+        radii.pill,
+      backgroundColor:
+        colors.focus,
     },
 
     progressFill: {
       height: '100%',
-      borderRadius: radii.pill,
-      backgroundColor: colors.accentStrong,
+      borderRadius:
+        radii.pill,
+      backgroundColor:
+        colors.accentStrong,
     },
 
     levelMeta: {
-      marginTop: 8,
-      color: colors.textTertiary,
-      fontSize: typography.caption,
-      lineHeight: 15,
+      color:
+        colors.accentStrong,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
     },
 
-    sectionHeader: {
+    summaryStrip: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-      marginTop: 24,
-      marginBottom: 10,
+      padding:
+        spacing.md,
+      borderRadius:
+        radii.lg,
+      borderWidth: 1,
+      borderColor:
+        colors.border,
+      backgroundColor:
+        colors.surface,
+      ...elevation.card,
+    },
+
+    summaryItem: {
+      flex: 1,
+      alignItems: 'center',
+      gap:
+        spacing.xxs,
+    },
+
+    summaryDivider: {
+      width: 1,
+      height: 34,
+      backgroundColor:
+        colors.border,
+    },
+
+    summaryValue: {
+      color:
+        colors.primary,
+      fontSize:
+        typography.subheading,
+      lineHeight:
+        typography.lineHeightSubheading,
+      fontWeight:
+        typography.weightExtraBold,
+    },
+
+    summaryLabel: {
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+    },
+
+    sectionHeading: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent:
+        'space-between',
+      gap:
+        spacing.md,
     },
 
     sectionTitle: {
-      marginTop: 24,
-      color: colors.text,
-      fontSize: typography.subheading,
-      fontWeight: typography.weightBold,
+      color:
+        colors.text,
+      fontSize:
+        typography.subheading,
+      lineHeight:
+        typography.lineHeightSubheading,
+      fontWeight:
+        typography.weightBold,
     },
 
     sectionMeta: {
-      marginTop: 24,
-      color: colors.textTertiary,
-      fontSize: typography.caption,
+      color:
+        colors.textTertiary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
     },
 
     streakGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 9,
-      marginTop: 10,
+      gap:
+        spacing.sm,
     },
 
     streakCard: {
-      width: '31%',
-      minWidth: 95,
-      padding: 13,
-      borderRadius: radii.md,
-      backgroundColor: colors.surface,
+      width: '48%',
+      minHeight: 138,
+      padding:
+        spacing.md,
+      borderRadius:
+        radii.lg,
       borderWidth: 1,
-      borderColor: colors.border,
-      ...elevation.card
+      borderColor:
+        colors.border,
+      backgroundColor:
+        colors.surface,
+      ...elevation.card,
+    },
+
+    streakIcon: {
+      width: 36,
+      height: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius:
+        radii.md,
+      backgroundColor:
+        colors.primarySoft,
     },
 
     streakName: {
-      color: colors.textSecondary,
-      fontSize: typography.caption,
-      fontWeight: typography.weightSemibold,
+      marginTop:
+        spacing.sm,
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+      fontWeight:
+        typography.weightBold,
     },
 
     streakValue: {
-      marginTop: 6,
-      color: colors.primary,
-      fontSize: typography.heading,
-      fontWeight: typography.weightBold,
+      marginTop:
+        spacing.xxs,
+      color:
+        colors.primary,
+      fontSize: 28,
+      lineHeight: 34,
+      fontWeight:
+        typography.weightExtraBold,
     },
 
     streakMeta: {
-      marginTop: 2,
-      color: colors.textTertiary,
-      fontSize: typography.caption,
-      lineHeight: 12,
+      color:
+        colors.textTertiary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
     },
 
     challengeList: {
-      gap: 10,
+      gap:
+        spacing.md,
     },
 
     challengeCard: {
-      padding: 16,
-      borderRadius: radii.lg,
-      backgroundColor: colors.surface,
+      gap:
+        spacing.md,
+      padding:
+        spacing.md,
+      borderRadius:
+        radii.lg,
       borderWidth: 1,
-      borderColor: colors.border,
-      ...elevation.card
+      borderColor:
+        colors.border,
+      backgroundColor:
+        colors.surface,
+      ...elevation.card,
+    },
+
+    challengeCardCompleted: {
+      borderColor:
+        colors.accentStrong,
+      backgroundColor:
+        colors.successSurface,
     },
 
     challengeHeader: {
       flexDirection: 'row',
       alignItems: 'flex-start',
-      gap: 10,
+      justifyContent:
+        'space-between',
+      gap:
+        spacing.sm,
+    },
+
+    challengeIdentity: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap:
+        spacing.sm,
+    },
+
+    challengeIcon: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius:
+        radii.md,
+      backgroundColor:
+        colors.primarySoft,
+    },
+
+    challengeIconCompleted: {
+      backgroundColor:
+        colors.successSurface,
     },
 
     challengeCopy: {
       flex: 1,
+      minWidth: 0,
     },
 
     challengeTitle: {
-      color: colors.text,
-      fontSize: typography.small,
-      fontWeight: typography.weightBold,
+      color:
+        colors.text,
+      fontSize:
+        typography.body,
+      lineHeight:
+        typography.lineHeightBody,
+      fontWeight:
+        typography.weightBold,
     },
 
     challengeCadence: {
-      marginTop: 3,
-      color: colors.textSecondary,
-      fontSize: typography.caption,
-      fontWeight: typography.weightSemibold,
-    },
-
-    challengeDescription: {
-      marginTop: 8,
-      color: colors.textSecondary,
-      fontSize: typography.caption,
-      lineHeight: 17,
+      marginTop:
+        spacing.xxs,
+      color:
+        colors.textTertiary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
     },
 
     premiumPill: {
-      paddingHorizontal: 8,
-      paddingVertical: 5,
-      borderRadius: radii.pill,
-      backgroundColor: colors.surfaceMuted,
+      paddingHorizontal:
+        spacing.sm,
+      paddingVertical:
+        spacing.xs,
+      borderRadius:
+        radii.pill,
+      backgroundColor:
+        colors.warningSurface,
     },
 
     premiumText: {
-      color: colors.textSecondary,
-      fontSize: typography.caption,
-      fontWeight: typography.weightBold,
-      letterSpacing: 0.7,
+      color:
+        colors.warning,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+      fontWeight:
+        typography.weightExtraBold,
+    },
+
+    challengeDescription: {
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+    },
+
+    challengeActive: {
+      gap:
+        spacing.sm,
     },
 
     challengeProgressRow: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
-      flexWrap: 'wrap',
-      gap: 8,
-      marginTop: 12,
+      alignItems: 'flex-end',
+      justifyContent:
+        'space-between',
+      gap:
+        spacing.md,
+      padding:
+        spacing.sm,
+      borderRadius:
+        radii.md,
+      backgroundColor:
+        colors.surfaceMuted,
+    },
+
+    challengeProgressLabel: {
+      color:
+        colors.textTertiary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
     },
 
     challengeProgress: {
-      color: colors.primary,
-      fontSize: typography.caption,
-      fontWeight: typography.weightBold,
+      marginTop:
+        spacing.xxs,
+      color:
+        colors.primary,
+      fontSize:
+        typography.subheading,
+      lineHeight:
+        typography.lineHeightSubheading,
+      fontWeight:
+        typography.weightExtraBold,
     },
 
     challengePeriod: {
-      color: colors.textTertiary,
-      fontSize: typography.caption,
-    },
-
-    primaryAction: {
-      alignSelf: 'flex-start',
-      marginTop: 12,
-      paddingHorizontal: 13,
-      paddingVertical: 9,
-      borderRadius: radii.sm,
-      backgroundColor: colors.primary,
-    },
-
-    primaryActionText: {
-      color: colors.textOnPrimary,
-      fontSize: typography.caption,
-      fontWeight: typography.weightBold,
-    },
-
-    secondaryAction: {
-      alignSelf: 'flex-start',
-      marginTop: 10,
-      paddingHorizontal: 13,
-      paddingVertical: 9,
-      borderRadius: radii.sm,
-      backgroundColor: colors.primarySoft,
-    },
-
-    secondaryActionText: {
-      color: colors.primary,
-      fontSize: typography.caption,
-      fontWeight: typography.weightBold,
+      flex: 1,
+      color:
+        colors.textTertiary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
+      textAlign: 'right',
     },
 
     completedBanner: {
-      alignSelf: 'flex-start',
-      marginTop: 12,
-      paddingHorizontal: 11,
-      paddingVertical: 7,
-      borderRadius: radii.pill,
-      backgroundColor: colors.primarySoft,
+      minHeight:
+        layout.touchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap:
+        spacing.xs,
+      borderRadius:
+        radii.md,
+      backgroundColor:
+        colors.successSurface,
     },
 
     completedText: {
-      color: colors.primary,
-      fontSize: typography.caption,
-      fontWeight: typography.weightBold,
+      color:
+        colors.success,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+      fontWeight:
+        typography.weightBold,
+    },
+
+    emptyCard: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap:
+        spacing.sm,
+      padding:
+        spacing.md,
+      borderRadius:
+        radii.lg,
+      borderWidth: 1,
+      borderColor:
+        colors.border,
+      backgroundColor:
+        colors.surface,
+      ...elevation.card,
+    },
+
+    emptyIcon: {
+      width: 42,
+      height: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius:
+        radii.md,
+      backgroundColor:
+        colors.primarySoft,
+    },
+
+    emptyCopy: {
+      flex: 1,
+      gap:
+        spacing.xxs,
+    },
+
+    emptyTitle: {
+      color:
+        colors.text,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+      fontWeight:
+        typography.weightBold,
+    },
+
+    emptyBody: {
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
     },
 
     badgeList: {
-      gap: 8,
+      gap:
+        spacing.sm,
     },
 
     badgeCard: {
+      minHeight: 72,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 11,
-      padding: 13,
-      borderRadius: radii.md,
-      backgroundColor: colors.surface,
+      gap:
+        spacing.sm,
+      padding:
+        spacing.md,
+      borderRadius:
+        radii.lg,
       borderWidth: 1,
-      borderColor: colors.border,
-      ...elevation.card
+      borderColor:
+        colors.border,
+      backgroundColor:
+        colors.surface,
     },
 
     badgeIcon: {
-      width: 34,
-      height: 34,
+      width: 40,
+      height: 40,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: radii.pill,
-      backgroundColor: colors.primarySoft,
-    },
-
-    badgeIconText: {
-      color: colors.primary,
-      fontSize: typography.small,
-      fontWeight: typography.weightBold,
+      borderRadius:
+        radii.md,
+      backgroundColor:
+        colors.successSurface,
     },
 
     badgeCopy: {
       flex: 1,
+      minWidth: 0,
     },
 
     badgeName: {
-      color: colors.text,
-      fontSize: typography.caption,
-      fontWeight: typography.weightBold,
+      color:
+        colors.text,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+      fontWeight:
+        typography.weightBold,
     },
 
     badgeDescription: {
-      marginTop: 2,
-      color: colors.textSecondary,
-      fontSize: typography.caption,
-      lineHeight: 15,
-    },
-
-    emptyCard: {
-      padding: 15,
-      borderRadius: radii.md,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      ...elevation.card
-    },
-
-    emptyTitle: {
-      color: colors.text,
-      fontSize: typography.caption,
-      fontWeight: typography.weightBold,
-    },
-
-    emptyBody: {
-      marginTop: 3,
-      color: colors.textSecondary,
-      fontSize: typography.caption,
-      lineHeight: 16,
+      marginTop:
+        spacing.xxs,
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
     },
 
     eventList: {
-      gap: 7,
+      paddingHorizontal:
+        spacing.md,
+      borderRadius:
+        radii.lg,
+      borderWidth: 1,
+      borderColor:
+        colors.border,
+      backgroundColor:
+        colors.surface,
+      ...elevation.card,
     },
 
     eventRow: {
+      minHeight: 68,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
-      padding: 12,
-      borderRadius: radii.md,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      ...elevation.card
+      gap:
+        spacing.sm,
+      paddingVertical:
+        spacing.sm,
+    },
+
+    divider: {
+      height:
+        StyleSheet.hairlineWidth,
+      backgroundColor:
+        colors.border,
+    },
+
+    eventIcon: {
+      width: 36,
+      height: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius:
+        radii.md,
+      backgroundColor:
+        colors.primarySoft,
     },
 
     eventCopy: {
       flex: 1,
+      minWidth: 0,
     },
 
     eventName: {
-      color: colors.text,
-      fontSize: typography.caption,
-      fontWeight: typography.weightBold,
-      textTransform: 'capitalize',
+      color:
+        colors.text,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+      fontWeight:
+        typography.weightBold,
     },
 
     eventDate: {
-      marginTop: 2,
-      color: colors.textTertiary,
-      fontSize: typography.caption,
+      marginTop:
+        spacing.xxs,
+      color:
+        colors.textTertiary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
     },
 
     eventPoints: {
-      color: colors.primary,
-      fontSize: typography.small,
-      fontWeight: typography.weightBold,
+      color:
+        colors.success,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+      fontWeight:
+        typography.weightExtraBold,
     },
 
     noteCard: {
-      marginTop: 22,
-      padding: 14,
-      borderRadius: radii.md,
-      backgroundColor: colors.surfaceMuted,
-      ...elevation.card
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap:
+        spacing.sm,
+      padding:
+        spacing.md,
+      borderRadius:
+        radii.lg,
+      backgroundColor:
+        colors.primarySoft,
+    },
+
+    noteIcon: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius:
+        radii.md,
+      backgroundColor:
+        colors.white,
+    },
+
+    noteCopy: {
+      flex: 1,
+      gap:
+        spacing.xxs,
     },
 
     noteTitle: {
-      color: colors.textSecondary,
-      fontSize: typography.caption,
-      fontWeight: typography.weightBold,
+      color:
+        colors.primary,
+      fontSize:
+        typography.small,
+      lineHeight:
+        typography.lineHeightSmall,
+      fontWeight:
+        typography.weightBold,
     },
 
     noteBody: {
-      marginTop: 4,
-      color: colors.textSecondary,
-      fontSize: typography.caption,
-      lineHeight: 17,
+      color:
+        colors.textSecondary,
+      fontSize:
+        typography.caption,
+      lineHeight:
+        typography.lineHeightCaption,
     },
   });

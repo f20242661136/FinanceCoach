@@ -105,7 +105,8 @@ SubscriptionProvider({
 
   const configuration =
     useMemo(
-      revenueCatConfiguration,
+      () =>
+        revenueCatConfiguration(),
       [],
     );
 

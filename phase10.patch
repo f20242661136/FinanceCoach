@@ -1,0 +1,3549 @@
+diff -ruN phase10_original/.env.example phase10_work/.env.example
+--- phase10_original/.env.example	1970-01-01 00:00:00.000000000 +0000
++++ phase10_work/.env.example	2026-09-27 03:29:17.682682700 +0000
+@@ -0,0 +1,10 @@
++# Expo / Supabase client configuration
++EXPO_PUBLIC_SUPABASE_URL=
++EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
++
++# RevenueCat public SDK keys
++# Android is the launch target for Phase 12.
++EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY=goog_
++
++# Keep this configured only if/when the iOS build is enabled.
++EXPO_PUBLIC_REVENUECAT_IOS_API_KEY=appl_
+diff -ruN phase10_original/src/app/(app)/(finance)/subscription.tsx phase10_work/src/app/(app)/(finance)/subscription.tsx
+--- phase10_original/src/app/(app)/(finance)/subscription.tsx	1970-01-01 00:00:00.000000000 +0000
++++ phase10_work/src/app/(app)/(finance)/subscription.tsx	2026-09-27 03:26:21.511837741 +0000
+@@ -0,0 +1,3 @@
++export {
++  SubscriptionScreen as default,
++} from '../../../features/subscriptions/subscription-screen';
+diff -ruN phase10_original/src/features/finance/local-first-screens.tsx phase10_work/src/features/finance/local-first-screens.tsx
+--- phase10_original/src/features/finance/local-first-screens.tsx	2026-09-27 03:30:27.432019305 +0000
++++ phase10_work/src/features/finance/local-first-screens.tsx	2026-09-27 03:26:55.320495492 +0000
+@@ -3,6 +3,10 @@
+ } from '../notifications/home-notifications-card';
+ 
+ import {
++  HomeSubscriptionCard,
++} from '../subscriptions/home-subscription-card';
++
++import {
+   HomeAiCoachCard,
+ } from '../ai-coach/home-ai-coach-card';
+ 
+@@ -633,6 +637,8 @@
+ 
+       <HomeAiCoachCard />
+ 
++      <HomeSubscriptionCard />
++
+       <HomeNotificationsCard />
+ 
+       <View
+diff -ruN phase10_original/src/features/gamification/gamification-screen.tsx phase10_work/src/features/gamification/gamification-screen.tsx
+--- phase10_original/src/features/gamification/gamification-screen.tsx	2026-09-27 03:30:27.432394030 +0000
++++ phase10_work/src/features/gamification/gamification-screen.tsx	2026-09-27 03:26:34.125556087 +0000
+@@ -20,6 +20,14 @@
+ } from '@/design/tokens';
+ 
+ import {
++  useRouter,
++} from 'expo-router';
++
++import {
++  useSubscription,
++} from '@/features/subscriptions/subscription-context';
++
++import {
+   gamificationEventLabel,
+   gamificationStreakLabel,
+ } from './gamification-format';
+@@ -86,6 +94,16 @@
+ 
+ 
+ export function GamificationScreen() {
++  const router =
++    useRouter();
++
++  const {
++    status:
++      subscriptionStatus,
++    hasPremiumEntitlement,
++  } =
++    useSubscription();
++
+   const timezone =
+     useMemo(() => deviceTimezone(), []);
+ 
+@@ -601,8 +619,24 @@
+                     accessibilityRole="button"
+                     disabled={
+                       startMutation.isPending
++                      || (
++                        challenge.is_premium
++                        && subscriptionStatus ===
++                          'initializing'
++                      )
+                     }
+                     onPress={() => {
++                      if (
++                        challenge.is_premium
++                        && !hasPremiumEntitlement
++                      ) {
++                        router.push(
++                          '/subscription' as never,
++                        );
++
++                        return;
++                      }
++
+                       void startMutation
+                         .mutateAsync(
+                           challenge.id,
+@@ -617,7 +651,13 @@
+                         styles.primaryActionText
+                       }
+                     >
+-                      Start challenge
++                      {challenge.is_premium
++                      && !hasPremiumEntitlement
++                        ? subscriptionStatus ===
++                            'initializing'
++                          ? 'Checking Premium…'
++                          : 'Unlock with Premium'
++                        : 'Start challenge'}
+                     </Text>
+                   </Pressable>
+                 )}
+diff -ruN phase10_original/src/features/subscriptions/SUBSCRIPTION_ARCHITECTURE.md phase10_work/src/features/subscriptions/SUBSCRIPTION_ARCHITECTURE.md
+--- phase10_original/src/features/subscriptions/SUBSCRIPTION_ARCHITECTURE.md	1970-01-01 00:00:00.000000000 +0000
++++ phase10_work/src/features/subscriptions/SUBSCRIPTION_ARCHITECTURE.md	2026-09-27 03:36:07.074465998 +0000
+@@ -0,0 +1,120 @@
++# Finance Coach Subscription Architecture
++
++## Phase 10 contract
++
++RevenueCat is the subscription provider. The mobile SDK gives immediate purchase
++and restore feedback, while Supabase stores a webhook-projected entitlement for
++server-side authorization.
++
++The entitlement identifier is:
++
++`premium`
++
++Only features that are explicitly marked Premium should be gated. At the time of
++this Phase 10 implementation, gamification already has an `is_premium` flag and
++is the first domain wired to that contract. Existing seeded challenges remain
++free unless product configuration deliberately marks a challenge Premium.
++
++Core finance features are not silently converted to Premium by this phase.
++
++## Client flow
++
++1. `SubscriptionProvider` configures RevenueCat with the authenticated Supabase
++   user ID as the RevenueCat App User ID.
++2. The Subscription screen fetches the current RevenueCat Offering.
++3. A package purchase uses `Purchases.purchasePackage`.
++4. Restore uses `Purchases.restorePurchases`.
++5. Customer Center is available for subscription management.
++6. `CustomerInfo.entitlements.active.premium` drives immediate client UX.
++7. Trial, cancellation, billing-issue and expiration states are derived from the
++   RevenueCat entitlement metadata.
++
++## Server trust boundary
++
++The client entitlement is not enough to authorize a protected server action.
++
++RevenueCat webhooks are written into `subscription_webhook_events` and projected
++into `subscription_entitlements`. Server-side Premium gates read that projected
++row and require:
++
++- `entitlement_id = 'premium'`;
++- `is_active = true`;
++- `current_period_ends_at` is null or still in the future.
++
++Phase 10 adds this enforcement to Premium-marked gamification challenge starts.
++Future Premium RPCs should reuse the same internal entitlement predicate rather
++than trusting a client boolean.
++
++After applying the Phase 10 migration, regenerate `src/types/database.types.ts`
++from the migrated Supabase schema so the generated database contract includes
++subscription tables and RPCs. The client status service currently uses a narrow
++RPC boundary so this migration can be applied before regenerated types land.
++
++## Trial and cancellation behavior
++
++RevenueCat `period_type` is persisted on the projected entitlement. A trial is
++still Premium while the entitlement is active. Cancellation does not revoke
++access early; access remains until expiration. An `EXPIRATION` webhook removes
++Premium access.
++
++A billing issue is surfaced to the user, but access follows the entitlement
++state projected by RevenueCat rather than being revoked merely because a billing
++issue event exists.
++
++## Google Play setup
++
++Before purchase testing can succeed, configure RevenueCat and Google Play so
++that:
++
++1. The Android app uses package `com.f2024.financecoach`.
++2. The Google Play subscription/base plan exists and is active for the test
++   track being used.
++3. The RevenueCat Google Play app is connected to the Play product.
++4. The product is attached to the RevenueCat `premium` entitlement.
++5. The package is included in RevenueCat's current Offering.
++6. `EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY` contains the Android public SDK key.
++7. The RevenueCat webhook targets the deployed `revenuecat-webhook` Edge
++   Function and uses the configured server-only authorization secret.
++8. Webhook signing should be enabled when available and matched with
++   `REVENUECAT_WEBHOOK_SIGNING_SECRET`.
++
++RevenueCat purchases require a native development/release build; Expo Go is not
++sufficient for validating Google Play Billing.
++
++## Purchase verification timing
++
++A successful store purchase can appear in `CustomerInfo` before the webhook has
++updated Supabase. During that short window the UI may show Premium while a
++protected server RPC still rejects the action. The Subscription screen exposes
++both client and server status so this state is visible rather than silently
++bypassed.
++
++## Transfer events
++
++`TRANSFER` webhooks are reconciled with RevenueCat's server API because the
++transfer webhook itself does not contain enough entitlement lifecycle detail to
++safely rebuild the projection. The Edge Function looks up each transferred
++Finance Coach UUID with the server-only `REVENUECAT_SECRET_API_KEY`, derives the
++current `premium` entitlement, and calls the service-role-only reconciliation
++RPC.
++
++If RevenueCat sends identifiers that are not Finance Coach UUIDs, the webhook
++response records that manual reconciliation is still required for those
++identifiers instead of granting access from untrusted guesses.
++
++## Required real-device scenarios
++
++- fresh free user;
++- successful purchase;
++- store-cancelled purchase dialog;
++- restore with an entitled Play account;
++- restore with no entitlement;
++- active trial;
++- cancellation while access remains active;
++- expiration;
++- billing issue;
++- app reinstall followed by restore;
++- sign out and sign in with a different Finance Coach user;
++- webhook delay between local entitlement and server verification;
++- Premium RPC invoked directly by a free user;
++- RevenueCat transfer event reconciliation.
+diff -ruN phase10_original/src/features/subscriptions/home-subscription-card.tsx phase10_work/src/features/subscriptions/home-subscription-card.tsx
+--- phase10_original/src/features/subscriptions/home-subscription-card.tsx	1970-01-01 00:00:00.000000000 +0000
++++ phase10_work/src/features/subscriptions/home-subscription-card.tsx	2026-09-27 03:26:54.898345070 +0000
+@@ -0,0 +1,196 @@
++import {
++  Pressable,
++  StyleSheet,
++  Text,
++  View,
++} from 'react-native';
++
++import {
++  useMemo,
++} from 'react';
++
++import {
++  useRouter,
++} from 'expo-router';
++
++import {
++  colors,
++  elevation,
++  radii,
++  typography,
++} from '@/design/tokens';
++
++import {
++  useSubscription,
++} from './subscription-context';
++
++import {
++  premiumSubscriptionStatusFrom,
++} from './subscription-status';
++
++
++export function HomeSubscriptionCard() {
++  const router =
++    useRouter();
++
++  const {
++    status,
++    customerInfo,
++  } =
++    useSubscription();
++
++  const premium =
++    useMemo(
++      () =>
++        premiumSubscriptionStatusFrom(
++          customerInfo,
++        ),
++      [
++        customerInfo,
++      ],
++    );
++
++  const title =
++    status === 'initializing'
++      ? 'Checking your plan…'
++      : premium.hasPremium
++        ? premium.lifecycle ===
++            'trial'
++          ? 'Premium trial active'
++          : 'Premium is active'
++        : 'Free plan';
++
++  const body =
++    status === 'disabled'
++      ? 'Subscriptions are unavailable in this build.'
++      : premium.hasPremium
++        ? 'Review renewal, trial, restore and subscription management details.'
++        : 'Unlock features that are explicitly marked Premium.';
++
++
++  return (
++    <Pressable
++      accessibilityRole="button"
++      onPress={() => {
++        router.push(
++          '/subscription' as never,
++        );
++      }}
++      style={({ pressed }) => [
++        styles.card,
++        pressed
++          ? styles.pressed
++          : null,
++      ]}
++    >
++      <View
++        style={
++          styles.header
++        }
++      >
++        <Text
++          style={
++            styles.eyebrow
++          }
++        >
++          SUBSCRIPTION
++        </Text>
++
++        <Text
++          style={
++            styles.chevron
++          }
++        >
++          ›
++        </Text>
++      </View>
++
++      <Text
++        style={
++          styles.title
++        }
++      >
++        {title}
++      </Text>
++
++      <Text
++        style={
++          styles.body
++        }
++      >
++        {body}
++      </Text>
++    </Pressable>
++  );
++}
++
++
++const styles =
++  StyleSheet.create({
++    card: {
++      marginBottom: 18,
++      padding: 17,
++      borderRadius:
++        radii.lg,
++      backgroundColor:
++        colors.surface,
++      borderWidth: 1,
++      borderColor:
++        colors.border,
++      ...elevation.card,
++    },
++
++    pressed: {
++      opacity: 0.82,
++      transform: [
++        {
++          scale: 0.995,
++        },
++      ],
++    },
++
++    header: {
++      flexDirection:
++        'row',
++      alignItems:
++        'center',
++      justifyContent:
++        'space-between',
++    },
++
++    eyebrow: {
++      color:
++        colors.primary,
++      fontSize:
++        typography.caption,
++      fontWeight:
++        typography.weightBold,
++      letterSpacing: 1.2,
++    },
++
++    chevron: {
++      color:
++        colors.textTertiary,
++      fontSize: 22,
++      lineHeight: 22,
++    },
++
++    title: {
++      marginTop: 9,
++      color:
++        colors.text,
++      fontSize:
++        typography.subheading,
++      fontWeight:
++        typography.weightBold,
++    },
++
++    body: {
++      marginTop: 5,
++      color:
++        colors.textSecondary,
++      fontSize:
++        typography.caption,
++      lineHeight: 18,
++    },
++  });
+diff -ruN phase10_original/src/features/subscriptions/subscription-screen.tsx phase10_work/src/features/subscriptions/subscription-screen.tsx
+--- phase10_original/src/features/subscriptions/subscription-screen.tsx	1970-01-01 00:00:00.000000000 +0000
++++ phase10_work/src/features/subscriptions/subscription-screen.tsx	2026-09-27 03:26:21.511135613 +0000
+@@ -0,0 +1,1477 @@
++import {
++  useCallback,
++  useEffect,
++  useMemo,
++  useState,
++} from 'react';
++
++import {
++  ActivityIndicator,
++  Pressable,
++  RefreshControl,
++  ScrollView,
++  StyleSheet,
++  Text,
++  View,
++} from 'react-native';
++
++import {
++  useRouter,
++} from 'expo-router';
++
++import {
++  RevenueCatUI,
++} from 'react-native-purchases-ui';
++
++import type {
++  PurchasesOffering,
++  PurchasesPackage,
++} from 'react-native-purchases';
++
++import {
++  colors,
++  elevation,
++  layout,
++  radii,
++  spacing,
++  typography,
++} from '@/design/tokens';
++
++import {
++  useSubscription,
++} from './subscription-context';
++
++import {
++  getCurrentRevenueCatOffering,
++  purchaseRevenueCatPackage,
++  restoreRevenueCatPurchases,
++  revenueCatOperationErrorMessage,
++  wasRevenueCatPurchaseCancelled,
++} from './subscription-service';
++
++import {
++  getMyServerSubscriptionStatus,
++  type ServerSubscriptionStatus,
++} from './subscription-server-service';
++
++import {
++  premiumSubscriptionStatusFrom,
++  type PremiumLifecycleStatus,
++} from './subscription-status';
++
++
++function lifecycleTitle(
++  lifecycle:
++    PremiumLifecycleStatus,
++): string {
++  switch (lifecycle) {
++    case 'trial':
++      return 'Premium trial active';
++
++    case 'active':
++      return 'Premium active';
++
++    case 'cancelling':
++      return 'Premium remains active';
++
++    case 'billing_issue':
++      return 'Premium needs attention';
++
++    case 'expired':
++      return 'Premium expired';
++
++    case 'free':
++      return 'Free plan';
++  }
++}
++
++
++function lifecycleBody(
++  lifecycle:
++    PremiumLifecycleStatus,
++): string {
++  switch (lifecycle) {
++    case 'trial':
++      return 'Your trial currently unlocks Premium features.';
++
++    case 'active':
++      return 'Your Premium entitlement is active.';
++
++    case 'cancelling':
++      return 'Auto-renewal is off. Premium remains available until the current period ends.';
++
++    case 'billing_issue':
++      return 'Your entitlement is still active, but the store reported a billing issue. Review your subscription management options.';
++
++    case 'expired':
++      return 'Your previous Premium entitlement is no longer active.';
++
++    case 'free':
++      return 'Core Finance Coach features remain available. Premium-only features stay locked.';
++  }
++}
++
++
++function formatDate(
++  value: string | null,
++): string | null {
++  if (!value) {
++    return null;
++  }
++
++  const date =
++    new Date(
++      value,
++    );
++
++  if (
++    Number.isNaN(
++      date.getTime(),
++    )
++  ) {
++    return value;
++  }
++
++  return Intl.DateTimeFormat(
++    undefined,
++    {
++      dateStyle:
++        'medium',
++    },
++  ).format(
++    date,
++  );
++}
++
++
++function packageLabel(
++  selectedPackage:
++    PurchasesPackage,
++): string {
++  const title =
++    selectedPackage
++      .product
++      .title
++      .trim();
++
++  return title
++    || selectedPackage.identifier;
++}
++
++
++export function SubscriptionScreen() {
++  const router =
++    useRouter();
++
++  const {
++    status,
++    customerInfo,
++    hasPremiumEntitlement,
++    error:
++      subscriptionRuntimeError,
++    refreshSubscription,
++  } =
++    useSubscription();
++
++  const premiumStatus =
++    useMemo(
++      () =>
++        premiumSubscriptionStatusFrom(
++          customerInfo,
++        ),
++      [
++        customerInfo,
++      ],
++    );
++
++  const [
++    offering,
++    setOffering,
++  ] =
++    useState<
++      PurchasesOffering | null
++    >(
++      null,
++    );
++
++  const [
++    offeringLoading,
++    setOfferingLoading,
++  ] =
++    useState(false);
++
++  const [
++    operation,
++    setOperation,
++  ] =
++    useState<
++      'purchase'
++      | 'restore'
++      | 'manage'
++      | null
++    >(
++      null,
++    );
++
++  const [
++    message,
++    setMessage,
++  ] =
++    useState<
++      string | null
++    >(
++      null,
++    );
++
++  const [
++    operationError,
++    setOperationError,
++  ] =
++    useState<
++      string | null
++    >(
++      null,
++    );
++
++  const [
++    serverStatus,
++    setServerStatus,
++  ] =
++    useState<
++      ServerSubscriptionStatus | null
++    >(
++      null,
++    );
++
++  const [
++    serverStatusError,
++    setServerStatusError,
++  ] =
++    useState<
++      string | null
++    >(
++      null,
++    );
++
++  const [
++    refreshing,
++    setRefreshing,
++  ] =
++    useState(false);
++
++
++  const refreshServerStatus =
++    useCallback(
++      async () => {
++        try {
++          const nextStatus =
++            await getMyServerSubscriptionStatus();
++
++          setServerStatus(
++            nextStatus,
++          );
++
++          setServerStatusError(
++            null,
++          );
++        } catch (
++          serverError
++        ) {
++          setServerStatusError(
++            revenueCatOperationErrorMessage(
++              serverError,
++            ),
++          );
++        }
++      },
++      [],
++    );
++
++
++  const loadOffering =
++    useCallback(
++      async () => {
++        if (
++          status !== 'ready'
++        ) {
++          return;
++        }
++
++        setOfferingLoading(
++          true,
++        );
++
++        try {
++          const nextOffering =
++            await getCurrentRevenueCatOffering();
++
++          setOffering(
++            nextOffering,
++          );
++        } catch (
++          offeringError
++        ) {
++          setOperationError(
++            revenueCatOperationErrorMessage(
++              offeringError,
++            ),
++          );
++        } finally {
++          setOfferingLoading(
++            false,
++          );
++        }
++      },
++      [
++        status,
++      ],
++    );
++
++
++  useEffect(() => {
++    if (
++      status === 'ready'
++    ) {
++      void loadOffering();
++      void refreshServerStatus();
++    }
++  }, [
++    loadOffering,
++    refreshServerStatus,
++    status,
++  ]);
++
++
++  async function refreshAll() {
++    setRefreshing(
++      true,
++    );
++
++    try {
++      await refreshSubscription();
++      await Promise.all([
++        loadOffering(),
++        refreshServerStatus(),
++      ]);
++    } finally {
++      setRefreshing(
++        false,
++      );
++    }
++  }
++
++
++  async function purchase(
++    selectedPackage:
++      PurchasesPackage,
++  ) {
++    setOperation(
++      'purchase',
++    );
++
++    setOperationError(
++      null,
++    );
++
++    setMessage(
++      null,
++    );
++
++    try {
++      const nextCustomerInfo =
++        await purchaseRevenueCatPackage(
++          selectedPackage,
++        );
++
++      const purchasedStatus =
++        premiumSubscriptionStatusFrom(
++          nextCustomerInfo,
++        );
++
++      await refreshSubscription();
++      await refreshServerStatus();
++
++      setMessage(
++        purchasedStatus.hasPremium
++          ? 'Premium is active on this device. Server verification will follow the RevenueCat webhook.'
++          : 'The store completed the purchase, but Premium is not active yet. Refresh after RevenueCat finishes syncing.',
++      );
++    } catch (
++      purchaseError
++    ) {
++      if (
++        !wasRevenueCatPurchaseCancelled(
++          purchaseError,
++        )
++      ) {
++        setOperationError(
++          revenueCatOperationErrorMessage(
++            purchaseError,
++          ),
++        );
++      }
++    } finally {
++      setOperation(
++        null,
++      );
++    }
++  }
++
++
++  async function restore() {
++    setOperation(
++      'restore',
++    );
++
++    setOperationError(
++      null,
++    );
++
++    setMessage(
++      null,
++    );
++
++    try {
++      const restoredInfo =
++        await restoreRevenueCatPurchases();
++
++      const restoredStatus =
++        premiumSubscriptionStatusFrom(
++          restoredInfo,
++        );
++
++      await refreshSubscription();
++      await refreshServerStatus();
++
++      setMessage(
++        restoredStatus.hasPremium
++          ? 'Premium purchases restored.'
++          : 'Restore completed. No active Premium entitlement was found for this store account.',
++      );
++    } catch (
++      restoreError
++    ) {
++      setOperationError(
++        revenueCatOperationErrorMessage(
++          restoreError,
++        ),
++      );
++    } finally {
++      setOperation(
++        null,
++      );
++    }
++  }
++
++
++  async function manageSubscription() {
++    setOperation(
++      'manage',
++    );
++
++    setOperationError(
++      null,
++    );
++
++    try {
++      await RevenueCatUI
++        .presentCustomerCenter();
++
++      await refreshSubscription();
++      await refreshServerStatus();
++    } catch (
++      manageError
++    ) {
++      setOperationError(
++        revenueCatOperationErrorMessage(
++          manageError,
++        ),
++      );
++    } finally {
++      setOperation(
++        null,
++      );
++    }
++  }
++
++
++  const expirationLabel =
++    formatDate(
++      premiumStatus
++        .expirationDate,
++    );
++
++  const serverPeriodEnd =
++    formatDate(
++      serverStatus
++        ?.current_period_ends_at
++      ?? null,
++    );
++
++  const runtimeUnavailable =
++    status === 'disabled';
++
++  const runtimeBusy =
++    status === 'idle'
++    || status === 'initializing';
++
++  const operationBusy =
++    operation !== null;
++
++
++  return (
++    <ScrollView
++      style={
++        styles.screen
++      }
++      contentContainerStyle={
++        styles.content
++      }
++      refreshControl={
++        <RefreshControl
++          refreshing={
++            refreshing
++          }
++          onRefresh={() => {
++            void refreshAll();
++          }}
++        />
++      }
++    >
++      <View
++        style={
++          styles.header
++        }
++      >
++        <Pressable
++          accessibilityRole="button"
++          onPress={() => {
++            router.back();
++          }}
++          style={
++            styles.backButton
++          }
++        >
++          <Text
++            style={
++              styles.backText
++            }
++          >
++            ‹ Back
++          </Text>
++        </Pressable>
++
++        <Text
++          style={
++            styles.eyebrow
++          }
++        >
++          FINANCE COACH PREMIUM
++        </Text>
++
++        <Text
++          style={
++            styles.title
++          }
++        >
++          Subscription
++        </Text>
++
++        <Text
++          style={
++            styles.subtitle
++          }
++        >
++          Purchases are handled by your app-store account through RevenueCat. Premium access is also verified server-side before protected features can run.
++        </Text>
++      </View>
++
++
++      <View
++        style={
++          styles.statusCard
++        }
++      >
++        <Text
++          style={
++            styles.statusEyebrow
++          }
++        >
++          CURRENT PLAN
++        </Text>
++
++        <Text
++          style={
++            styles.statusTitle
++          }
++        >
++          {runtimeBusy
++            ? 'Checking subscription…'
++            : lifecycleTitle(
++                premiumStatus.lifecycle,
++              )}
++        </Text>
++
++        <Text
++          style={
++            styles.body
++          }
++        >
++          {runtimeUnavailable
++            ? 'RevenueCat is not configured for this platform/build.'
++            : lifecycleBody(
++                premiumStatus.lifecycle,
++              )}
++        </Text>
++
++        {expirationLabel ? (
++          <Text
++            style={
++              styles.meta
++            }
++          >
++            {premiumStatus.lifecycle ===
++              'trial'
++              ? 'Trial ends'
++              : premiumStatus.lifecycle ===
++                  'cancelling'
++                ? 'Access until'
++                : 'Current period ends'}
++            {': '}
++            {expirationLabel}
++          </Text>
++        ) : null}
++
++        {premiumStatus.productIdentifier ? (
++          <Text
++            style={
++              styles.meta
++            }
++          >
++            Product: {
++              premiumStatus
++                .productIdentifier
++            }
++          </Text>
++        ) : null}
++
++        {premiumStatus.isSandbox ? (
++          <View
++            style={
++              styles.sandboxPill
++            }
++          >
++            <Text
++              style={
++                styles.sandboxText
++              }
++            >
++              SANDBOX
++            </Text>
++          </View>
++        ) : null}
++      </View>
++
++
++      {subscriptionRuntimeError ? (
++        <View
++          style={
++            styles.errorCard
++          }
++        >
++          <Text
++            style={
++              styles.errorText
++            }
++          >
++            {subscriptionRuntimeError}
++          </Text>
++        </View>
++      ) : null}
++
++      {operationError ? (
++        <View
++          style={
++            styles.errorCard
++          }
++        >
++          <Text
++            style={
++              styles.errorText
++            }
++          >
++            {operationError}
++          </Text>
++        </View>
++      ) : null}
++
++      {message ? (
++        <View
++          style={
++            styles.infoCard
++          }
++        >
++          <Text
++            style={
++              styles.infoText
++            }
++          >
++            {message}
++          </Text>
++        </View>
++      ) : null}
++
++
++      {!hasPremiumEntitlement ? (
++        <View
++          style={
++            styles.section
++          }
++        >
++          <Text
++            style={
++              styles.sectionTitle
++            }
++          >
++            Upgrade to Premium
++          </Text>
++
++          <Text
++            style={
++              styles.body
++            }
++          >
++            Only features explicitly marked as Premium are gated. Existing core finance features remain available on the free plan.
++          </Text>
++
++          {offeringLoading ? (
++            <View
++              style={
++                styles.loadingRow
++              }
++            >
++              <ActivityIndicator
++                size="small"
++                color={
++                  colors.primary
++                }
++              />
++
++              <Text
++                style={
++                  styles.body
++                }
++              >
++                Loading subscription options…
++              </Text>
++            </View>
++          ) : offering
++              ?.availablePackages
++              .length ? (
++            <View
++              style={
++                styles.packageStack
++              }
++            >
++              {offering
++                .availablePackages
++                .map(
++                  (
++                    availablePackage,
++                  ) => (
++                    <View
++                      key={
++                        availablePackage
++                          .identifier
++                      }
++                      style={
++                        styles.packageCard
++                      }
++                    >
++                      <View
++                        style={
++                          styles.packageCopy
++                        }
++                      >
++                        <Text
++                          style={
++                            styles.packageTitle
++                          }
++                        >
++                          {packageLabel(
++                            availablePackage,
++                          )}
++                        </Text>
++
++                        <Text
++                          style={
++                            styles.packagePrice
++                          }
++                        >
++                          {availablePackage
++                            .product
++                            .priceString}
++                        </Text>
++
++                        {availablePackage
++                          .product
++                          .description ? (
++                          <Text
++                            style={
++                              styles.packageDescription
++                            }
++                          >
++                            {availablePackage
++                              .product
++                              .description}
++                          </Text>
++                        ) : null}
++                      </View>
++
++                      <Pressable
++                        accessibilityRole="button"
++                        disabled={
++                          operationBusy
++                        }
++                        onPress={() => {
++                          void purchase(
++                            availablePackage,
++                          );
++                        }}
++                        style={[
++                          styles.primaryButton,
++                          operationBusy
++                            ? styles.disabled
++                            : null,
++                        ]}
++                      >
++                        <Text
++                          style={
++                            styles.primaryButtonText
++                          }
++                        >
++                          {operation ===
++                            'purchase'
++                            ? 'Processing…'
++                            : `Subscribe · ${availablePackage.product.priceString}`}
++                        </Text>
++                      </Pressable>
++                    </View>
++                  ),
++                )}
++            </View>
++          ) : status === 'ready' ? (
++            <View
++              style={
++                styles.infoCard
++              }
++            >
++              <Text
++                style={
++                  styles.infoText
++                }
++              >
++                No current RevenueCat Offering is available. Configure a Google Play subscription product, attach it to the premium entitlement, and add it to the current Offering.
++              </Text>
++            </View>
++          ) : null}
++
++          <Text
++            style={
++              styles.legalNote
++            }
++          >
++            Any free trial or introductory offer configured for the store product is displayed by the store before purchase. Renewal and cancellation follow the store terms shown at checkout.
++          </Text>
++        </View>
++      ) : null}
++
++
++      <View
++        style={
++          styles.section
++        }
++      >
++        <Text
++          style={
++            styles.sectionTitle
++          }
++        >
++          Purchase controls
++        </Text>
++
++        <Pressable
++          accessibilityRole="button"
++          disabled={
++            operationBusy
++            || runtimeUnavailable
++            || runtimeBusy
++          }
++          onPress={() => {
++            void restore();
++          }}
++          style={[
++            styles.secondaryButton,
++            operationBusy
++            || runtimeUnavailable
++            || runtimeBusy
++              ? styles.disabled
++              : null,
++          ]}
++        >
++          <Text
++            style={
++              styles.secondaryButtonText
++            }
++          >
++            {operation === 'restore'
++              ? 'Restoring…'
++              : 'Restore purchases'}
++          </Text>
++        </Pressable>
++
++        {premiumStatus.lifecycle !==
++          'free' ? (
++          <Pressable
++            accessibilityRole="button"
++            disabled={
++              operationBusy
++              || runtimeUnavailable
++            }
++            onPress={() => {
++              void manageSubscription();
++            }}
++            style={[
++              styles.secondaryButton,
++              operationBusy
++              || runtimeUnavailable
++                ? styles.disabled
++                : null,
++            ]}
++          >
++            <Text
++              style={
++                styles.secondaryButtonText
++              }
++            >
++              {operation === 'manage'
++                ? 'Opening…'
++                : 'Manage subscription'}
++            </Text>
++          </Pressable>
++        ) : null}
++      </View>
++
++
++      <View
++        style={
++          styles.section
++        }
++      >
++        <Text
++          style={
++            styles.sectionTitle
++          }
++        >
++          Server verification
++        </Text>
++
++        <Text
++          style={
++            styles.body
++          }
++        >
++          Premium RPCs use the webhook-backed entitlement stored in Supabase rather than trusting the mobile UI alone.
++        </Text>
++
++        {serverStatus ? (
++          <View
++            style={
++              styles.serverGrid
++            }
++          >
++            <Text
++              style={
++                styles.meta
++              }
++            >
++              Verified access: {
++                serverStatus
++                  .has_premium
++                  ? 'Yes'
++                  : 'No'
++              }
++            </Text>
++
++            {serverStatus.period_type ? (
++              <Text
++                style={
++                  styles.meta
++                }
++              >
++                Period: {
++                  serverStatus
++                    .period_type
++                }
++              </Text>
++            ) : null}
++
++            {serverStatus
++              .last_event_type ? (
++              <Text
++                style={
++                  styles.meta
++                }
++              >
++                Last event: {
++                  serverStatus
++                    .last_event_type
++                }
++              </Text>
++            ) : null}
++
++            {serverPeriodEnd ? (
++              <Text
++                style={
++                  styles.meta
++                }
++              >
++                Server period end: {
++                  serverPeriodEnd
++                }
++              </Text>
++            ) : null}
++          </View>
++        ) : serverStatusError ? (
++          <Text
++            style={
++              styles.warningText
++            }
++          >
++            Could not read server subscription status: {
++              serverStatusError
++            }
++          </Text>
++        ) : (
++          <Text
++            style={
++              styles.body
++            }
++          >
++            Waiting for subscription status…
++          </Text>
++        )}
++
++        {hasPremiumEntitlement
++        && serverStatus
++        && !serverStatus.has_premium ? (
++          <View
++            style={
++              styles.warningCard
++            }
++          >
++            <Text
++              style={
++                styles.warningText
++              }
++            >
++              RevenueCat reports Premium locally, but the server webhook has not verified it yet. Protected server actions remain locked until verification arrives.
++            </Text>
++          </View>
++        ) : null}
++      </View>
++    </ScrollView>
++  );
++}
++
++
++const styles =
++  StyleSheet.create({
++    screen: {
++      flex: 1,
++      backgroundColor:
++        colors.background,
++    },
++
++    content: {
++      width: '100%',
++      maxWidth:
++        layout.contentMaxWidth,
++      alignSelf: 'center',
++      paddingHorizontal:
++        layout.screenHorizontalPadding,
++      paddingTop:
++        spacing.lg,
++      paddingBottom:
++        spacing.xxxl,
++    },
++
++    header: {
++      marginBottom:
++        spacing.lg,
++    },
++
++    backButton: {
++      alignSelf:
++        'flex-start',
++      minHeight:
++        layout.touchTarget,
++      justifyContent:
++        'center',
++      marginBottom:
++        spacing.sm,
++    },
++
++    backText: {
++      color:
++        colors.primary,
++      fontSize:
++        typography.small,
++      fontWeight:
++        typography.weightBold,
++    },
++
++    eyebrow: {
++      color:
++        colors.primary,
++      fontSize:
++        typography.caption,
++      fontWeight:
++        typography.weightBold,
++      letterSpacing: 1.2,
++    },
++
++    title: {
++      marginTop:
++        spacing.xs,
++      color:
++        colors.text,
++      fontSize:
++        typography.heading,
++      lineHeight:
++        typography.lineHeightHeading,
++      fontWeight:
++        typography.weightExtraBold,
++    },
++
++    subtitle: {
++      marginTop:
++        spacing.sm,
++      color:
++        colors.textSecondary,
++      fontSize:
++        typography.small,
++      lineHeight:
++        typography.lineHeightSmall,
++    },
++
++    statusCard: {
++      padding:
++        spacing.md,
++      borderRadius:
++        radii.lg,
++      borderWidth: 1,
++      borderColor:
++        colors.border,
++      backgroundColor:
++        colors.surface,
++      ...elevation.card,
++    },
++
++    statusEyebrow: {
++      color:
++        colors.primary,
++      fontSize:
++        typography.caption,
++      fontWeight:
++        typography.weightBold,
++      letterSpacing: 1,
++    },
++
++    statusTitle: {
++      marginTop:
++        spacing.xs,
++      color:
++        colors.text,
++      fontSize:
++        typography.subheading,
++      lineHeight:
++        typography.lineHeightSubheading,
++      fontWeight:
++        typography.weightBold,
++    },
++
++    body: {
++      marginTop:
++        spacing.xs,
++      color:
++        colors.textSecondary,
++      fontSize:
++        typography.small,
++      lineHeight:
++        typography.lineHeightSmall,
++    },
++
++    meta: {
++      marginTop:
++        spacing.xs,
++      color:
++        colors.textSecondary,
++      fontSize:
++        typography.caption,
++      lineHeight:
++        typography.lineHeightCaption,
++    },
++
++    sandboxPill: {
++      alignSelf:
++        'flex-start',
++      marginTop:
++        spacing.sm,
++      paddingHorizontal:
++        spacing.sm,
++      paddingVertical:
++        spacing.xxs,
++      borderRadius:
++        radii.pill,
++      backgroundColor:
++        colors.warningSurface,
++    },
++
++    sandboxText: {
++      color:
++        colors.warning,
++      fontSize:
++        typography.caption,
++      fontWeight:
++        typography.weightBold,
++    },
++
++    section: {
++      marginTop:
++        spacing.lg,
++      padding:
++        spacing.md,
++      borderRadius:
++        radii.lg,
++      borderWidth: 1,
++      borderColor:
++        colors.border,
++      backgroundColor:
++        colors.surface,
++    },
++
++    sectionTitle: {
++      color:
++        colors.text,
++      fontSize:
++        typography.subheading,
++      lineHeight:
++        typography.lineHeightSubheading,
++      fontWeight:
++        typography.weightBold,
++    },
++
++    loadingRow: {
++      marginTop:
++        spacing.md,
++      flexDirection:
++        'row',
++      alignItems:
++        'center',
++      gap:
++        spacing.sm,
++    },
++
++    packageStack: {
++      marginTop:
++        spacing.md,
++      gap:
++        spacing.sm,
++    },
++
++    packageCard: {
++      padding:
++        spacing.md,
++      borderRadius:
++        radii.md,
++      borderWidth: 1,
++      borderColor:
++        colors.borderStrong,
++      backgroundColor:
++        colors.surfaceMuted,
++    },
++
++    packageCopy: {
++      marginBottom:
++        spacing.md,
++    },
++
++    packageTitle: {
++      color:
++        colors.text,
++      fontSize:
++        typography.body,
++      lineHeight:
++        typography.lineHeightBody,
++      fontWeight:
++        typography.weightBold,
++    },
++
++    packagePrice: {
++      marginTop:
++        spacing.xxs,
++      color:
++        colors.primary,
++      fontSize:
++        typography.subheading,
++      fontWeight:
++        typography.weightBold,
++    },
++
++    packageDescription: {
++      marginTop:
++        spacing.xs,
++      color:
++        colors.textSecondary,
++      fontSize:
++        typography.caption,
++      lineHeight:
++        typography.lineHeightCaption,
++    },
++
++    primaryButton: {
++      minHeight:
++        layout.touchTarget,
++      alignItems:
++        'center',
++      justifyContent:
++        'center',
++      paddingHorizontal:
++        spacing.md,
++      borderRadius:
++        radii.md,
++      backgroundColor:
++        colors.primary,
++    },
++
++    primaryButtonText: {
++      color:
++        colors.textOnPrimary,
++      fontSize:
++        typography.small,
++      fontWeight:
++        typography.weightBold,
++    },
++
++    secondaryButton: {
++      minHeight:
++        layout.touchTarget,
++      marginTop:
++        spacing.sm,
++      alignItems:
++        'center',
++      justifyContent:
++        'center',
++      paddingHorizontal:
++        spacing.md,
++      borderRadius:
++        radii.md,
++      borderWidth: 1,
++      borderColor:
++        colors.borderStrong,
++      backgroundColor:
++        colors.surfaceMuted,
++    },
++
++    secondaryButtonText: {
++      color:
++        colors.primary,
++      fontSize:
++        typography.small,
++      fontWeight:
++        typography.weightBold,
++    },
++
++    disabled: {
++      opacity: 0.45,
++    },
++
++    legalNote: {
++      marginTop:
++        spacing.md,
++      color:
++        colors.textTertiary,
++      fontSize:
++        typography.caption,
++      lineHeight:
++        typography.lineHeightCaption,
++    },
++
++    infoCard: {
++      marginTop:
++        spacing.md,
++      padding:
++        spacing.md,
++      borderRadius:
++        radii.md,
++      backgroundColor:
++        colors.infoSurface,
++    },
++
++    infoText: {
++      color:
++        colors.info,
++      fontSize:
++        typography.caption,
++      lineHeight:
++        typography.lineHeightCaption,
++    },
++
++    errorCard: {
++      marginTop:
++        spacing.md,
++      padding:
++        spacing.md,
++      borderRadius:
++        radii.md,
++      backgroundColor:
++        colors.dangerSurface,
++    },
++
++    errorText: {
++      color:
++        colors.danger,
++      fontSize:
++        typography.caption,
++      lineHeight:
++        typography.lineHeightCaption,
++    },
++
++    warningCard: {
++      marginTop:
++        spacing.sm,
++      padding:
++        spacing.sm,
++      borderRadius:
++        radii.md,
++      backgroundColor:
++        colors.warningSurface,
++    },
++
++    warningText: {
++      marginTop:
++        spacing.xs,
++      color:
++        colors.warning,
++      fontSize:
++        typography.caption,
++      lineHeight:
++        typography.lineHeightCaption,
++    },
++
++    serverGrid: {
++      marginTop:
++        spacing.sm,
++    },
++  });
+diff -ruN phase10_original/src/features/subscriptions/subscription-server-service.ts phase10_work/src/features/subscriptions/subscription-server-service.ts
+--- phase10_original/src/features/subscriptions/subscription-server-service.ts	1970-01-01 00:00:00.000000000 +0000
++++ phase10_work/src/features/subscriptions/subscription-server-service.ts	2026-09-27 03:24:41.164467056 +0000
+@@ -0,0 +1,92 @@
++import {
++  z,
++} from 'zod';
++
++import {
++  supabase,
++} from '@/lib/supabase';
++
++
++const serverSubscriptionStatusSchema =
++  z.object({
++    entitlement_id:
++      z.literal('premium'),
++
++    has_premium:
++      z.boolean(),
++
++    product_id:
++      z.string().nullable(),
++
++    store:
++      z.string().nullable(),
++
++    environment:
++      z.string().nullable(),
++
++    period_type:
++      z.string().nullable()
++        .optional()
++        .default(null),
++
++    current_period_ends_at:
++      z.string().nullable(),
++
++    will_renew:
++      z.boolean().nullable(),
++
++    last_event_type:
++      z.string().nullable(),
++
++    updated_at:
++      z.string().nullable(),
++  });
++
++export type ServerSubscriptionStatus =
++  z.infer<
++    typeof serverSubscriptionStatusSchema
++  >;
++
++
++type RpcResult = {
++  data: unknown;
++
++  error: {
++    message: string;
++  } | null;
++};
++
++const callRpc =
++  supabase.rpc.bind(
++    supabase,
++  ) as unknown as (
++    functionName: string,
++    args?: Record<
++      string,
++      unknown
++    >,
++  ) => Promise<RpcResult>;
++
++
++export async function
++getMyServerSubscriptionStatus():
++  Promise<ServerSubscriptionStatus> {
++  const {
++    data,
++    error,
++  } =
++    await callRpc(
++      'get_my_subscription_status',
++    );
++
++  if (error) {
++    throw new Error(
++      error.message,
++    );
++  }
++
++  return serverSubscriptionStatusSchema
++    .parse(
++      data,
++    );
++}
+diff -ruN phase10_original/src/features/subscriptions/subscription-service.ts phase10_work/src/features/subscriptions/subscription-service.ts
+--- phase10_original/src/features/subscriptions/subscription-service.ts	1970-01-01 00:00:00.000000000 +0000
++++ phase10_work/src/features/subscriptions/subscription-service.ts	2026-09-27 03:24:41.163056745 +0000
+@@ -0,0 +1,83 @@
++import Purchases, {
++  type CustomerInfo,
++  type PurchasesOffering,
++  type PurchasesPackage,
++} from 'react-native-purchases';
++
++
++export async function
++getCurrentRevenueCatOffering():
++  Promise<PurchasesOffering | null> {
++  const offerings =
++    await Purchases.getOfferings();
++
++  return offerings.current
++    ?? null;
++}
++
++
++export async function
++purchaseRevenueCatPackage(
++  selectedPackage:
++    PurchasesPackage,
++): Promise<CustomerInfo> {
++  const result =
++    await Purchases.purchasePackage(
++      selectedPackage,
++    );
++
++  return result.customerInfo;
++}
++
++
++export async function
++restoreRevenueCatPurchases():
++  Promise<CustomerInfo> {
++  return Purchases
++    .restorePurchases();
++}
++
++
++export function
++wasRevenueCatPurchaseCancelled(
++  error: unknown,
++): boolean {
++  if (
++    !error
++    || typeof error !== 'object'
++    || !('userCancelled' in error)
++  ) {
++    return false;
++  }
++
++  return (
++    error as {
++      userCancelled?: unknown;
++    }
++  ).userCancelled === true;
++}
++
++
++export function
++revenueCatOperationErrorMessage(
++  error: unknown,
++): string {
++  if (
++    error
++    && typeof error === 'object'
++    && 'message' in error
++    && typeof (
++      error as {
++        message?: unknown;
++      }
++    ).message === 'string'
++  ) {
++    return (
++      error as {
++        message: string;
++      }
++    ).message;
++  }
++
++  return 'The subscription request could not be completed.';
++}
+diff -ruN phase10_original/src/features/subscriptions/subscription-status.ts phase10_work/src/features/subscriptions/subscription-status.ts
+--- phase10_original/src/features/subscriptions/subscription-status.ts	1970-01-01 00:00:00.000000000 +0000
++++ phase10_work/src/features/subscriptions/subscription-status.ts	2026-09-27 03:24:41.163772323 +0000
+@@ -0,0 +1,178 @@
++import type {
++  CustomerInfo,
++} from 'react-native-purchases';
++
++import {
++  REVENUECAT_PREMIUM_ENTITLEMENT_ID,
++} from './subscription-config';
++
++
++export type PremiumLifecycleStatus =
++  | 'free'
++  | 'trial'
++  | 'active'
++  | 'cancelling'
++  | 'billing_issue'
++  | 'expired';
++
++export type PremiumSubscriptionStatus = {
++  lifecycle:
++    PremiumLifecycleStatus;
++
++  hasPremium:
++    boolean;
++
++  productIdentifier:
++    string | null;
++
++  periodType:
++    string | null;
++
++  expirationDate:
++    string | null;
++
++  willRenew:
++    boolean | null;
++
++  unsubscribeDetectedAt:
++    string | null;
++
++  billingIssueDetectedAt:
++    string | null;
++
++  store:
++    string | null;
++
++  isSandbox:
++    boolean | null;
++};
++
++
++export function
++premiumSubscriptionStatusFrom(
++  customerInfo:
++    CustomerInfo | null,
++): PremiumSubscriptionStatus {
++  const entitlement =
++    customerInfo
++      ?.entitlements
++      .all[
++        REVENUECAT_PREMIUM_ENTITLEMENT_ID
++      ]
++    ?? null;
++
++  const hasPremium =
++    Boolean(
++      customerInfo
++        ?.entitlements
++        .active[
++          REVENUECAT_PREMIUM_ENTITLEMENT_ID
++        ],
++    );
++
++  if (!entitlement) {
++    return {
++      lifecycle:
++        'free',
++
++      hasPremium:
++        false,
++
++      productIdentifier:
++        null,
++
++      periodType:
++        null,
++
++      expirationDate:
++        null,
++
++      willRenew:
++        null,
++
++      unsubscribeDetectedAt:
++        null,
++
++      billingIssueDetectedAt:
++        null,
++
++      store:
++        null,
++
++      isSandbox:
++        null,
++    };
++  }
++
++  const periodType =
++    entitlement.periodType
++      ?? null;
++
++  const billingIssueDetectedAt =
++    entitlement.billingIssueDetectedAt
++      ?? null;
++
++  const unsubscribeDetectedAt =
++    entitlement.unsubscribeDetectedAt
++      ?? null;
++
++  let lifecycle:
++    PremiumLifecycleStatus;
++
++  if (!hasPremium) {
++    lifecycle =
++      'expired';
++  } else if (
++    billingIssueDetectedAt
++  ) {
++    lifecycle =
++      'billing_issue';
++  } else if (
++    periodType === 'TRIAL'
++  ) {
++    lifecycle =
++      'trial';
++  } else if (
++    unsubscribeDetectedAt
++    || entitlement.willRenew ===
++      false
++  ) {
++    lifecycle =
++      'cancelling';
++  } else {
++    lifecycle =
++      'active';
++  }
++
++  return {
++    lifecycle,
++
++    hasPremium,
++
++    productIdentifier:
++      entitlement.productIdentifier
++      ?? null,
++
++    periodType,
++
++    expirationDate:
++      entitlement.expirationDate
++      ?? null,
++
++    willRenew:
++      entitlement.willRenew
++      ?? null,
++
++    unsubscribeDetectedAt,
++
++    billingIssueDetectedAt,
++
++    store:
++      entitlement.store
++      ?? null,
++
++    isSandbox:
++      entitlement.isSandbox
++      ?? null,
++  };
++}
+diff -ruN phase10_original/supabase/functions/.env.example phase10_work/supabase/functions/.env.example
+--- phase10_original/supabase/functions/.env.example	1970-01-01 00:00:00.000000000 +0000
++++ phase10_work/supabase/functions/.env.example	2026-09-27 03:34:00.580256053 +0000
+@@ -0,0 +1,21 @@
++# Supabase Edge Function runtime
++SUPABASE_URL=
++SUPABASE_ANON_KEY=
++SUPABASE_SERVICE_ROLE_KEY=
++
++# AI Coach
++GROQ_API_KEY=
++GROQ_MODEL=openai/gpt-oss-20b
++
++# Notification dispatcher
++NOTIFICATION_DISPATCH_SECRET=
++
++# RevenueCat webhook
++# Secret API key is used only server-side to reconcile TRANSFER events.
++REVENUECAT_SECRET_API_KEY=
++
++# Configure RevenueCat to send the same Authorization header value.
++REVENUECAT_WEBHOOK_AUTHORIZATION=
++
++# Optional but recommended when webhook HMAC signing is enabled.
++REVENUECAT_WEBHOOK_SIGNING_SECRET=
+diff -ruN phase10_original/supabase/functions/revenuecat-webhook/index.ts phase10_work/supabase/functions/revenuecat-webhook/index.ts
+--- phase10_original/supabase/functions/revenuecat-webhook/index.ts	2026-09-27 03:30:27.436525840 +0000
++++ phase10_work/supabase/functions/revenuecat-webhook/index.ts	2026-09-27 03:33:47.565019220 +0000
+@@ -381,6 +381,420 @@
+     : date.toISOString();
+ }
+ 
++function objectOrNull(
++  value: unknown,
++): JsonObject | null {
++  return (
++    value
++    && typeof value ===
++      'object'
++    && !Array.isArray(
++      value,
++    )
++  )
++    ? value as JsonObject
++    : null;
++}
++
++function isoStringOrNull(
++  value: unknown,
++): string | null {
++  const text =
++    stringOrNull(
++      value,
++    );
++
++  if (!text) {
++    return null;
++  }
++
++  const date =
++    new Date(
++      text,
++    );
++
++  return Number.isNaN(
++    date.getTime(),
++  )
++    ? null
++    : date.toISOString();
++}
++
++function upperStringOrNull(
++  value: unknown,
++): string | null {
++  const text =
++    stringOrNull(
++      value,
++    );
++
++  return text
++    ? text.toUpperCase()
++    : null;
++}
++
++function laterDate(
++  first: string | null,
++  second: string | null,
++): string | null {
++  if (!first) {
++    return second;
++  }
++
++  if (!second) {
++    return first;
++  }
++
++  return new Date(
++    first,
++  ).getTime()
++    >= new Date(
++      second,
++    ).getTime()
++    ? first
++    : second;
++}
++
++type PremiumReconciliationSnapshot = {
++  isActive: boolean;
++  productId: string | null;
++  store: string | null;
++  periodType: string | null;
++  expirationAt: string | null;
++  willRenew: boolean | null;
++};
++
++function premiumSnapshotFromCustomer(
++  payload: JsonObject,
++  event: JsonObject,
++): PremiumReconciliationSnapshot {
++  const subscriber =
++    objectOrNull(
++      payload.subscriber,
++    );
++
++  if (!subscriber) {
++    throw new Error(
++      'RevenueCat customer response is missing subscriber data.',
++    );
++  }
++
++  const entitlements =
++    objectOrNull(
++      subscriber.entitlements,
++    );
++
++  const premium =
++    entitlements
++      ? objectOrNull(
++          entitlements.premium,
++        )
++      : null;
++
++  if (!premium) {
++    return {
++      isActive:
++        false,
++      productId:
++        null,
++      store:
++        upperStringOrNull(
++          event.store,
++        ),
++      periodType:
++        null,
++      expirationAt:
++        null,
++      willRenew:
++        null,
++    };
++  }
++
++  const expirationAt =
++    laterDate(
++      isoStringOrNull(
++        premium.expires_date,
++      ),
++      isoStringOrNull(
++        premium.grace_period_expires_date,
++      ),
++    );
++
++  const productId =
++    stringOrNull(
++      premium.product_identifier,
++    );
++
++  const subscriptions =
++    objectOrNull(
++      subscriber.subscriptions,
++    );
++
++  const subscription =
++    productId
++    && subscriptions
++      ? objectOrNull(
++          subscriptions[
++            productId
++          ],
++        )
++      : null;
++
++  const periodType =
++    upperStringOrNull(
++      subscription
++        ?.period_type,
++    );
++
++  const store =
++    upperStringOrNull(
++      subscription
++        ?.store,
++    )
++    ?? upperStringOrNull(
++      event.store,
++    );
++
++  const unsubscribeDetectedAt =
++    isoStringOrNull(
++      subscription
++        ?.unsubscribe_detected_at,
++    );
++
++  const isActive =
++    expirationAt === null
++    || new Date(
++      expirationAt,
++    ).getTime()
++      > Date.now();
++
++  const willRenew =
++    subscription
++      ? periodType ===
++          'PREPAID'
++        ? false
++        : unsubscribeDetectedAt
++          ? false
++          : isActive
++      : null;
++
++  return {
++    isActive,
++    productId,
++    store,
++    periodType,
++    expirationAt,
++    willRenew,
++  };
++}
++
++async function fetchRevenueCatCustomer(
++  appUserId: string,
++  secretApiKey: string,
++): Promise<JsonObject> {
++  const response =
++    await fetch(
++      `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(appUserId)}`,
++      {
++        method:
++          'GET',
++
++        headers: {
++          Authorization:
++            `Bearer ${secretApiKey}`,
++
++          Accept:
++            'application/json',
++        },
++      },
++    );
++
++  if (!response.ok) {
++    throw new Error(
++      `RevenueCat customer lookup failed with status ${response.status}.`,
++    );
++  }
++
++  const parsed =
++    await response.json();
++
++  const object =
++    objectOrNull(
++      parsed,
++    );
++
++  if (!object) {
++    throw new Error(
++      'RevenueCat customer lookup returned an invalid response.',
++    );
++  }
++
++  return object;
++}
++
++type TransferRpcClient = {
++  rpc: (
++    functionName: string,
++    args: Record<
++      string,
++      unknown
++    >,
++  ) => Promise<{
++    data: unknown;
++    error: {
++      message: string;
++    } | null;
++  }>;
++};
++
++async function reconcileTransferEvent(
++  event: JsonObject,
++  eventId: string,
++  eventTimestamp: string,
++  serviceClient: unknown,
++): Promise<{
++  reconciledUsers: number;
++  skippedIdentifiers: number;
++  requiresManualReconciliation: boolean;
++}> {
++  const rawIdentifiers = [
++    ...stringArray(
++      event.transferred_from,
++    ),
++    ...stringArray(
++      event.transferred_to,
++    ),
++  ];
++
++  const userIds =
++    Array.from(
++      new Set(
++        rawIdentifiers
++          .map(
++            (identifier) =>
++              uuidOrNull(
++                identifier,
++              ),
++          )
++          .filter(
++            (
++              identifier,
++            ): identifier is string =>
++              Boolean(
++                identifier,
++              ),
++          ),
++      ),
++    );
++
++  if (
++    userIds.length === 0
++  ) {
++    console.error(
++      'RevenueCat TRANSFER event has no Finance Coach UUID identifiers.',
++    );
++
++    return {
++      reconciledUsers:
++        0,
++      skippedIdentifiers:
++        rawIdentifiers.length,
++      requiresManualReconciliation:
++        true,
++    };
++  }
++
++  const secretApiKey =
++    getRequiredEnv(
++      'REVENUECAT_SECRET_API_KEY',
++    );
++
++  const rpcClient =
++    serviceClient as
++      TransferRpcClient;
++
++  let reconciledUsers =
++    0;
++
++  for (
++    const userId
++    of userIds
++  ) {
++    const customer =
++      await fetchRevenueCatCustomer(
++        userId,
++        secretApiKey,
++      );
++
++    const snapshot =
++      premiumSnapshotFromCustomer(
++        customer,
++        event,
++      );
++
++    const {
++      data,
++      error,
++    } =
++      await rpcClient.rpc(
++        'reconcile_revenuecat_premium_entitlement',
++        {
++          p_user_id:
++            userId,
++
++          p_is_active:
++            snapshot.isActive,
++
++          p_product_id:
++            snapshot.productId,
++
++          p_store:
++            snapshot.store,
++
++          p_environment:
++            upperStringOrNull(
++              event.environment,
++            ),
++
++          p_period_type:
++            snapshot.periodType,
++
++          p_expiration_at:
++            snapshot.expirationAt,
++
++          p_will_renew:
++            snapshot.willRenew,
++
++          p_source_event_id:
++            eventId,
++
++          p_source_event_at:
++            eventTimestamp,
++        },
++      );
++
++    if (error) {
++      throw new Error(
++        `RevenueCat transfer reconciliation failed: ${error.message}`,
++      );
++    }
++
++    if (data === true) {
++      reconciledUsers += 1;
++    }
++  }
++
++  return {
++    reconciledUsers,
++    skippedIdentifiers:
++      rawIdentifiers.length
++      - userIds.length,
++    requiresManualReconciliation:
++      rawIdentifiers.length
++      !== userIds.length,
++  };
++}
++
+ Deno.serve(
+   async (
+     request: Request,
+@@ -674,6 +1088,17 @@
+         );
+       }
+ 
++      const transferReconciliation =
++        eventType ===
++          'TRANSFER'
++          ? await reconcileTransferEvent(
++              event,
++              eventId,
++              eventTimestamp,
++              serviceClient,
++            )
++          : null;
++
+       return jsonResponse(
+         {
+           ok:
+@@ -681,6 +1106,9 @@
+ 
+           result:
+             data,
++
++          transfer_reconciliation:
++            transferReconciliation,
+         },
+       );
+     } catch (
+diff -ruN phase10_original/supabase/migrations/20260927090000_phase10_subscription_gating.sql phase10_work/supabase/migrations/20260927090000_phase10_subscription_gating.sql
+--- phase10_original/supabase/migrations/20260927090000_phase10_subscription_gating.sql	1970-01-01 00:00:00.000000000 +0000
++++ phase10_work/supabase/migrations/20260927090000_phase10_subscription_gating.sql	2026-09-27 03:34:34.591477438 +0000
+@@ -0,0 +1,547 @@
++-- Finance Coach
++-- Phase 10: subscription lifecycle visibility + server-side premium gating
++--
++-- Principles:
++-- - RevenueCat CustomerInfo drives immediate client UX.
++-- - Webhook-projected subscription_entitlements remains the server trust source.
++-- - Only features explicitly marked premium are gated.
++-- - Trial/cancellation/expiration status remains visible without granting
++--   access after the entitlement is inactive or expired.
++
++begin;
++
++
++-- -------------------------------------------------------------------------
++-- Persist the RevenueCat period type on the projected entitlement
++-- -------------------------------------------------------------------------
++
++alter table public.subscription_entitlements
++  add column if not exists period_type text null;
++
++
++create or replace function
++private.set_subscription_entitlement_period_type()
++returns trigger
++language plpgsql
++security definer
++set search_path = ''
++as $$
++declare
++  v_event_period_type text;
++begin
++  select swe.period_type
++  into v_event_period_type
++  from public.subscription_webhook_events swe
++  where swe.revenuecat_event_id = new.last_event_id;
++
++  if v_event_period_type is not null then
++    new.period_type :=
++      v_event_period_type;
++  end if;
++
++  return new;
++end;
++$$;
++
++revoke all on function
++private.set_subscription_entitlement_period_type()
++from public, anon, authenticated;
++
++
++drop trigger if exists
++subscription_entitlements_set_period_type
++on public.subscription_entitlements;
++
++create trigger
++subscription_entitlements_set_period_type
++before insert or update of last_event_id
++on public.subscription_entitlements
++for each row
++execute function
++private.set_subscription_entitlement_period_type();
++
++
++update public.subscription_entitlements se
++set period_type = swe.period_type
++from public.subscription_webhook_events swe
++where
++  swe.revenuecat_event_id = se.last_event_id
++  and se.period_type is distinct from swe.period_type;
++
++
++-- -------------------------------------------------------------------------
++-- Internal premium entitlement predicate
++-- -------------------------------------------------------------------------
++
++create or replace function
++private.has_active_premium_entitlement(
++  p_user_id uuid
++)
++returns boolean
++language sql
++stable
++security definer
++set search_path = ''
++as $$
++  select exists (
++    select 1
++    from public.subscription_entitlements se
++    where
++      se.user_id = p_user_id
++      and se.entitlement_id = 'premium'
++      and se.is_active = true
++      and (
++        se.current_period_ends_at is null
++        or se.current_period_ends_at > now()
++      )
++  );
++$$;
++
++revoke all on function
++private.has_active_premium_entitlement(uuid)
++from public, anon, authenticated;
++
++
++-- -------------------------------------------------------------------------
++-- Server-only reconciliation for RevenueCat TRANSFER events
++-- -------------------------------------------------------------------------
++
++create or replace function
++public.reconcile_revenuecat_premium_entitlement(
++  p_user_id uuid,
++  p_is_active boolean,
++  p_product_id text,
++  p_store text,
++  p_environment text,
++  p_period_type text,
++  p_expiration_at timestamptz,
++  p_will_renew boolean,
++  p_source_event_id text,
++  p_source_event_at timestamptz
++)
++returns boolean
++language plpgsql
++security definer
++set search_path = public, pg_catalog
++as $$
++begin
++  if auth.role() <> 'service_role' then
++    raise exception 'Service role required'
++      using errcode = '42501';
++  end if;
++
++  if
++    p_user_id is null
++    or p_source_event_id is null
++    or btrim(p_source_event_id) = ''
++    or p_source_event_at is null
++  then
++    raise exception 'Invalid subscription reconciliation input'
++      using errcode = '22023';
++  end if;
++
++  if not exists (
++    select 1
++    from auth.users u
++    where u.id = p_user_id
++  ) then
++    return false;
++  end if;
++
++  if not exists (
++    select 1
++    from public.subscription_webhook_events swe
++    where swe.revenuecat_event_id = p_source_event_id
++  ) then
++    raise exception 'Source RevenueCat event not found'
++      using errcode = '22023';
++  end if;
++
++  insert into public.subscription_entitlements (
++    user_id,
++    entitlement_id,
++    is_active,
++    product_id,
++    store,
++    environment,
++    period_type,
++    current_period_ends_at,
++    will_renew,
++    last_event_type,
++    last_event_id,
++    last_event_at
++  )
++  values (
++    p_user_id,
++    'premium',
++    coalesce(
++      p_is_active,
++      false
++    ),
++    nullif(
++      btrim(
++        coalesce(
++          p_product_id,
++          ''
++        )
++      ),
++      ''
++    ),
++    nullif(
++      btrim(
++        coalesce(
++          p_store,
++          ''
++        )
++      ),
++      ''
++    ),
++    nullif(
++      btrim(
++        coalesce(
++          p_environment,
++          ''
++        )
++      ),
++      ''
++    ),
++    nullif(
++      btrim(
++        coalesce(
++          p_period_type,
++          ''
++        )
++      ),
++      ''
++    ),
++    p_expiration_at,
++    p_will_renew,
++    'TRANSFER_RECONCILIATION',
++    p_source_event_id,
++    p_source_event_at
++  )
++  on conflict (
++    user_id,
++    entitlement_id
++  )
++  do update
++  set
++    is_active =
++      excluded.is_active,
++
++    product_id =
++      coalesce(
++        excluded.product_id,
++        subscription_entitlements.product_id
++      ),
++
++    store =
++      coalesce(
++        excluded.store,
++        subscription_entitlements.store
++      ),
++
++    environment =
++      coalesce(
++        excluded.environment,
++        subscription_entitlements.environment
++      ),
++
++    period_type =
++      coalesce(
++        excluded.period_type,
++        subscription_entitlements.period_type
++      ),
++
++    current_period_ends_at =
++      excluded.current_period_ends_at,
++
++    will_renew =
++      excluded.will_renew,
++
++    last_event_type =
++      excluded.last_event_type,
++
++    last_event_id =
++      excluded.last_event_id,
++
++    last_event_at =
++      excluded.last_event_at,
++
++    updated_at =
++      now()
++
++  where
++    excluded.last_event_at
++    >= subscription_entitlements.last_event_at;
++
++  return true;
++end;
++$$;
++
++revoke all on function
++public.reconcile_revenuecat_premium_entitlement(
++  uuid,
++  boolean,
++  text,
++  text,
++  text,
++  text,
++  timestamptz,
++  boolean,
++  text,
++  timestamptz
++)
++from public, anon, authenticated;
++
++grant execute on function
++public.reconcile_revenuecat_premium_entitlement(
++  uuid,
++  boolean,
++  text,
++  text,
++  text,
++  text,
++  timestamptz,
++  boolean,
++  text,
++  timestamptz
++)
++to service_role;
++
++
++-- -------------------------------------------------------------------------
++-- Premium gate for premium-marked gamification challenges
++-- -------------------------------------------------------------------------
++
++create or replace function public.start_gamification_challenge(
++  p_challenge_id uuid,
++  p_timezone text default 'UTC'
++)
++returns uuid
++language plpgsql
++security definer
++set search_path = public
++as $$
++declare
++  v_user_id uuid;
++  v_challenge public.challenges%rowtype;
++  v_period jsonb;
++  v_period_start date;
++  v_period_end date;
++  v_id uuid;
++begin
++  v_user_id :=
++    auth.uid();
++
++  if v_user_id is null then
++    raise exception 'Authentication required'
++      using errcode = '42501';
++  end if;
++
++
++  if not public.is_valid_timezone(
++    p_timezone
++  ) then
++    raise exception 'Invalid timezone'
++      using errcode = '22023';
++  end if;
++
++
++  select *
++  into v_challenge
++  from public.challenges c
++  where
++    c.id = p_challenge_id
++    and c.is_active = true;
++
++
++  if not found then
++    raise exception 'Challenge not found'
++      using errcode = '22023';
++  end if;
++
++
++  if
++    v_challenge.is_premium
++    and not private.has_active_premium_entitlement(
++      v_user_id
++    )
++  then
++    raise exception 'Premium subscription required'
++      using errcode = '42501';
++  end if;
++
++
++  v_period :=
++    public.gamification_period(
++      v_challenge.cadence,
++      p_timezone
++    );
++
++
++  v_period_start :=
++    (
++      v_period
++      ->> 'period_start'
++    )::date;
++
++  v_period_end :=
++    (
++      v_period
++      ->> 'period_end'
++    )::date;
++
++
++  insert into public.user_challenges (
++    user_id,
++    challenge_id,
++    timezone,
++    period_start,
++    period_end,
++    status,
++    progress_count
++  )
++  values (
++    v_user_id,
++    v_challenge.id,
++    p_timezone,
++    v_period_start,
++    v_period_end,
++    'active',
++    0
++  )
++  on conflict (
++    user_id,
++    challenge_id,
++    period_start
++  )
++  do update set
++    timezone =
++      excluded.timezone,
++
++    updated_at =
++      now()
++
++  returning id
++  into v_id;
++
++
++  return v_id;
++end;
++$$;
++
++revoke all on function public.start_gamification_challenge(uuid, text)
++  from public, anon;
++
++grant execute on function public.start_gamification_challenge(uuid, text)
++  to authenticated;
++
++
++-- -------------------------------------------------------------------------
++-- Subscription status RPC now exposes trial/period information
++-- -------------------------------------------------------------------------
++
++create or replace function
++public.get_my_subscription_status()
++returns jsonb
++language plpgsql
++stable
++security definer
++set search_path = public, pg_catalog
++as $$
++declare
++  v_user_id uuid;
++  v_entitlement
++    public.subscription_entitlements%rowtype;
++begin
++  v_user_id :=
++    auth.uid();
++
++  if v_user_id is null then
++    raise exception 'Authentication required'
++      using errcode = '42501';
++  end if;
++
++  select se.*
++  into v_entitlement
++  from public.subscription_entitlements se
++  where
++    se.user_id = v_user_id
++    and se.entitlement_id = 'premium';
++
++  if not found then
++    return jsonb_build_object(
++      'entitlement_id',
++      'premium',
++      'has_premium',
++      false,
++      'product_id',
++      null,
++      'store',
++      null,
++      'environment',
++      null,
++      'period_type',
++      null,
++      'current_period_ends_at',
++      null,
++      'will_renew',
++      null,
++      'last_event_type',
++      null,
++      'updated_at',
++      null
++    );
++  end if;
++
++  return jsonb_build_object(
++    'entitlement_id',
++    v_entitlement.entitlement_id,
++
++    'has_premium',
++    (
++      v_entitlement.is_active
++      and (
++        v_entitlement.current_period_ends_at is null
++        or v_entitlement.current_period_ends_at > now()
++      )
++    ),
++
++    'product_id',
++    v_entitlement.product_id,
++
++    'store',
++    v_entitlement.store,
++
++    'environment',
++    v_entitlement.environment,
++
++    'period_type',
++    v_entitlement.period_type,
++
++    'current_period_ends_at',
++    v_entitlement.current_period_ends_at,
++
++    'will_renew',
++    v_entitlement.will_renew,
++
++    'last_event_type',
++    v_entitlement.last_event_type,
++
++    'updated_at',
++    v_entitlement.updated_at
++  );
++end;
++$$;
++
++revoke all on function
++public.get_my_subscription_status()
++from public, anon;
++
++grant execute on function
++public.get_my_subscription_status()
++to authenticated, service_role;
++
++
++commit;
+diff -ruN phase10_original/supabase/tests/database/014_subscription_premium_gating.test.sql phase10_work/supabase/tests/database/014_subscription_premium_gating.test.sql
+--- phase10_original/supabase/tests/database/014_subscription_premium_gating.test.sql	1970-01-01 00:00:00.000000000 +0000
++++ phase10_work/supabase/tests/database/014_subscription_premium_gating.test.sql	2026-09-27 03:34:46.539104885 +0000
+@@ -0,0 +1,228 @@
++begin;
++
++create extension if not exists pgtap
++with schema extensions;
++
++select plan(9);
++
++insert into auth.users (
++  instance_id,
++  id,
++  aud,
++  role,
++  email,
++  encrypted_password,
++  email_confirmed_at,
++  raw_app_meta_data,
++  raw_user_meta_data,
++  created_at,
++  updated_at
++)
++values (
++  '00000000-0000-0000-0000-000000000000',
++  '55555555-5555-4555-8555-555555555555',
++  'authenticated',
++  'authenticated',
++  'premium-gating@example.test',
++  '',
++  now(),
++  '{}'::jsonb,
++  '{}'::jsonb,
++  now(),
++  now()
++);
++
++update public.challenges
++set is_premium = true
++where code = 'weekly_log_5_transactions';
++
++select set_config(
++  'request.jwt.claim.sub',
++  '55555555-5555-4555-8555-555555555555',
++  true
++);
++
++set local role authenticated;
++
++select ok(
++  not has_function_privilege(
++    'authenticated',
++    'public.reconcile_revenuecat_premium_entitlement(uuid,boolean,text,text,text,text,timestamptz,boolean,text,timestamptz)',
++    'EXECUTE'
++  ),
++  'authenticated cannot execute RevenueCat reconciliation RPC'
++);
++
++select ok(
++  has_function_privilege(
++    'service_role',
++    'public.reconcile_revenuecat_premium_entitlement(uuid,boolean,text,text,text,text,timestamptz,boolean,text,timestamptz)',
++    'EXECUTE'
++  ),
++  'service role can execute RevenueCat reconciliation RPC'
++);
++
++select throws_ok(
++  $$
++    select public.start_gamification_challenge(
++      (
++        select c.id
++        from public.challenges c
++        where c.code = 'weekly_log_5_transactions'
++      ),
++      'UTC'
++    )
++  $$,
++  '42501',
++  'Premium subscription required',
++  'free users cannot start premium-marked challenges'
++);
++
++select lives_ok(
++  $$
++    select public.start_gamification_challenge(
++      (
++        select c.id
++        from public.challenges c
++        where c.code = 'daily_log_transaction'
++      ),
++      'UTC'
++    )
++  $$,
++  'free users can still start non-premium challenges'
++);
++
++reset role;
++
++insert into public.subscription_webhook_events (
++  revenuecat_event_id,
++  event_type,
++  app_user_id,
++  user_id,
++  entitlement_ids,
++  product_id,
++  store,
++  environment,
++  period_type,
++  event_timestamp,
++  purchased_at,
++  expiration_at,
++  payload
++)
++values (
++  'phase10-test-initial-purchase',
++  'INITIAL_PURCHASE',
++  '55555555-5555-4555-8555-555555555555',
++  '55555555-5555-4555-8555-555555555555',
++  array['premium'],
++  'finance_coach_premium',
++  'PLAY_STORE',
++  'SANDBOX',
++  'TRIAL',
++  now(),
++  now(),
++  now() + interval '7 days',
++  '{}'::jsonb
++);
++
++insert into public.subscription_entitlements (
++  user_id,
++  entitlement_id,
++  is_active,
++  product_id,
++  store,
++  environment,
++  current_period_ends_at,
++  will_renew,
++  last_event_type,
++  last_event_id,
++  last_event_at
++)
++values (
++  '55555555-5555-4555-8555-555555555555',
++  'premium',
++  true,
++  'finance_coach_premium',
++  'PLAY_STORE',
++  'SANDBOX',
++  now() + interval '7 days',
++  true,
++  'INITIAL_PURCHASE',
++  'phase10-test-initial-purchase',
++  now()
++);
++
++select is(
++  (
++    select se.period_type
++    from public.subscription_entitlements se
++    where se.user_id =
++      '55555555-5555-4555-8555-555555555555'
++  ),
++  'TRIAL',
++  'projected entitlement records the RevenueCat trial period'
++);
++
++set local role authenticated;
++
++select is(
++  public.get_my_subscription_status()
++    ->> 'period_type',
++  'TRIAL',
++  'subscription status exposes trial state'
++);
++
++select is(
++  public.get_my_subscription_status()
++    ->> 'has_premium',
++  'true',
++  'active trial grants server-verified premium access'
++);
++
++select lives_ok(
++  $$
++    select public.start_gamification_challenge(
++      (
++        select c.id
++        from public.challenges c
++        where c.code = 'weekly_log_5_transactions'
++      ),
++      'UTC'
++    )
++  $$,
++  'premium users can start premium-marked challenges'
++);
++
++reset role;
++
++update public.subscription_entitlements
++set
++  is_active = false,
++  current_period_ends_at = now() - interval '1 minute',
++  updated_at = now()
++where user_id =
++  '55555555-5555-4555-8555-555555555555';
++
++set local role authenticated;
++
++select throws_ok(
++  $$
++    select public.start_gamification_challenge(
++      (
++        select c.id
++        from public.challenges c
++        where c.code = 'weekly_log_5_transactions'
++      ),
++      'UTC'
++    )
++  $$,
++  '42501',
++  'Premium subscription required',
++  'expired premium access is rejected server-side'
++);
++
++reset role;
++
++select * from finish();
++
++rollback;

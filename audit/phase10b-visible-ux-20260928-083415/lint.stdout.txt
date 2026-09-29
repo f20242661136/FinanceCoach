@@ -1,0 +1,23 @@
+env: load .env.local .env
+env: export EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY
+
+D:\finance-coach\src\app\(onboarding)\setup.tsx
+  211:10  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\finance-coach\src\app\(onboarding)\setup.tsx:211:10
+  209 |
+  210 |   useEffect(() => {
+> 211 |     void loadCurrencies();
+      |          ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  212 |   }, [loadCurrencies]);
+  213 |
+  214 |   const submit =  react-hooks/set-state-in-effect
+
+✖ 1 problem (1 error, 0 warnings)
+

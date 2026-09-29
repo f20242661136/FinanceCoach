@@ -1,0 +1,9 @@
+env: load .env.local .env
+env: export EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY
+
+D:\finance-coach\src\features\finance\local-first-screens.tsx
+    5:3   warning  'HomeSubscriptionCard' is defined but never used  @typescript-eslint/no-unused-vars
+  274:10  warning  'EmptyState' is defined but never used            @typescript-eslint/no-unused-vars
+
+✖ 2 problems (0 errors, 2 warnings)
+
