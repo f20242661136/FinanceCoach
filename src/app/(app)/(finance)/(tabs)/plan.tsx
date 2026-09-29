@@ -1,3 +1,1 @@
-export {
-  PlanScreen as default,
-} from '../../../../features/planning/plan-screen';
+export { PlanScreen as default } from '../../../../features/planning/plan-screen';
