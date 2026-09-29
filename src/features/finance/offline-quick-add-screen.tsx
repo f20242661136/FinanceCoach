@@ -1,746 +1,225 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { useRef, useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-
 import { AppButton } from '@/components/ui/app-button';
-import { InlineNotice } from '@/components/ui/inline-notice';
-import {
-  colors,
-  elevation,
-  layout,
-  radii,
-  spacing,
-  typography,
-} from '@/design/tokens';
+import { colors, elevation, typography } from '@/design/tokens';
+import { useAuth } from '@/features/auth/auth-context';
 import { toUserFacingError } from '@/lib/user-facing-error';
-import { useCreateOfflineTransaction } from '../../offline/sync/use-create-offline-transaction';
-import { useLocalTransactionOptions } from '../../offline/sync/use-local-transaction-options';
-
-type TransactionType = 'expense' | 'income';
-
-function localToday(): string {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
+import { useCreateOfflineTransaction } from '@/offline/sync/use-create-offline-transaction';
+import { useLocalTransactionOptions } from '@/offline/sync/use-local-transaction-options';
+import { useEntryHistory } from '@/features/smart-entry/use-entry-history';
+import { decimalFromMinor, entrySuggestions, localToday, validAmount, validDate, type EntryKind } from '@/features/smart-entry/entry-intelligence';
 
 export function OfflineQuickAddScreen() {
+  const { session } = useAuth();
+  const [kind, setKind] = useState<EntryKind>('expense');
+  return <EntryForm key={session?.user.id} kind={kind} onKindChange={setKind} />;
+}
+
+function EntryForm({ kind, onKindChange }: { kind: EntryKind; onKindChange: (kind: EntryKind) => void }) {
   const router = useRouter();
-  const [type, setType] = useState<TransactionType>('expense');
-  const [accountId, setAccountId] = useState('');
-  const [categoryId, setCategoryId] = useState('');
+  const options = useLocalTransactionOptions(kind);
+  const history = useEntryHistory();
+  const create = useCreateOfflineTransaction();
+  const saving = useRef(false);
+  const [accountChoice, setAccountChoice] = useState<string | null>(null);
+  const [categoryChoice, setCategoryChoice] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
-  const [transactionDate, setTransactionDate] = useState(localToday());
   const [merchant, setMerchant] = useState('');
+  const [date, setDate] = useState(localToday());
   const [notes, setNotes] = useState('');
-  const [showMore, setShowMore] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [details, setDetails] = useState(false);
+  const [allCategories, setAllCategories] = useState(false);
+  const [repeatLoaded, setRepeatLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const accounts = options.data?.accounts ?? [];
+  const categories = options.data?.categories ?? [];
+  const suggestions = entrySuggestions(history.data ?? [], accounts, categories, kind, merchant);
+  const accountId = accountChoice === null ? suggestions.accountId : accountChoice;
+  const categoryId = categoryChoice === null ? suggestions.categoryId : categoryChoice;
+  const account = accounts.find(item => item.id === accountId);
+  const category = categories.find(item => item.id === categoryId);
+  const orderedCategories = [...categories].sort((a, b) => Number(b.id === categoryId) - Number(a.id === categoryId));
+  const visibleCategories = allCategories ? orderedCategories : orderedCategories.slice(0, 6);
+  const busy = create.isPending;
+  const canSave = Boolean(account && category && validAmount(amount, account.currency_minor_unit) && validDate(date)) && !busy && !saved;
 
-  const options = useLocalTransactionOptions(type);
-  const createMutation = useCreateOfflineTransaction();
-
-  const accounts = useMemo(
-    () => options.data?.accounts ?? [],
-    [options.data?.accounts],
-  );
-  const categories = useMemo(
-    () => options.data?.categories ?? [],
-    [options.data?.categories],
-  );
-
-  useEffect(() => {
-    if (
-      accounts.length > 0
-      && !accounts.some(account => account.id === accountId)
-    ) {
-      // Preserve the existing safe default: seed the form with an active account.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setAccountId(accounts[0].id);
-    }
-  }, [accountId, accounts]);
-
-  const selectedAccount = useMemo(
-    () => accounts.find(account => account.id === accountId) ?? null,
-    [accountId, accounts],
-  );
-
-  const canSave = Boolean(
-    accountId
-    && amount.trim()
-    && transactionDate.trim(),
-  ) && !createMutation.isPending;
-
-  async function save() {
-    setErrorMessage(null);
-
-    try {
-      await createMutation.mutateAsync({
-        accountId,
-        categoryId: categoryId || null,
-        type,
-        amount,
-        transactionDate,
-        merchant,
-        notes,
-      });
-
-      router.back();
-    } catch (error) {
-      setErrorMessage(
-        toUserFacingError(error, 'transaction'),
-      );
-    }
+  function close() {
+    if (saving.current) return;
+    if (router.canGoBack()) router.back(); else router.replace('/home' as never);
   }
 
-  return (
-    <SafeAreaView edges={['bottom']} style={styles.safeArea}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.flex}
-      >
-        <View style={styles.screen}>
-          <ScrollView
-            style={styles.flex}
-            contentContainerStyle={styles.content}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.header}>
-              <View style={styles.headerRow}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Close transaction form"
-                  hitSlop={8}
-                  onPress={() => router.back()}
-                  style={({ pressed }) => [
-                    styles.iconButton,
-                    pressed ? styles.iconButtonPressed : null,
-                  ]}
-                >
-                  <Ionicons name="close" size={22} color={colors.text} />
-                </Pressable>
+  function repeat() {
+    const row = suggestions.repeat;
+    if (!row || busy) return;
+    setAccountChoice(row.account_id);
+    setCategoryChoice(row.category_id);
+    setAmount(decimalFromMinor(row.amount_minor, row.currency_minor_unit));
+    setMerchant(row.merchant ?? '');
+    setDate(localToday());
+    setNotes('');
+    setRepeatLoaded(true);
+    setError(null);
+  }
 
-                <Text accessibilityRole="header" style={styles.title}>
-                  Add transaction
-                </Text>
+  async function save() {
+    if (saving.current || !canSave || !account || !category) return;
+    saving.current = true;
+    setError(null);
+    try {
+      await create.mutateAsync({ accountId: account.id, categoryId: category.id, type: kind,
+        amount, transactionDate: date, merchant: merchant.trim(), notes: notes.trim() });
+      setSaved(true);
+    } catch (cause) {
+      setError(toUserFacingError(cause, 'transaction'));
+    } finally { saving.current = false; }
+  }
 
-                <View style={styles.iconButtonPlaceholder} />
-              </View>
+  function another() {
+    setAmount(''); setMerchant(''); setNotes(''); setDate(localToday());
+    setAccountChoice(null); setCategoryChoice(null); setRepeatLoaded(false); setSaved(false);
+    setError(null); setDetails(false); create.reset();
+  }
 
-              <Text style={styles.subtitle}>
-                Capture the essentials now. Extra details stay out of the way until you need them.
-              </Text>
-            </View>
+  if (saved) return <SafeAreaView edges={['bottom']} style={styles.safe}>
+    <View style={styles.success}>
+      <View style={styles.successIcon}><Ionicons name="checkmark" size={32} color={colors.success} /></View>
+      <Text accessibilityRole="header" accessibilityLiveRegion="polite" style={styles.title}>{kind === 'expense' ? 'Expense added' : 'Income added'}</Text>
+      <Text style={styles.successAmount}>{account?.currency_code} {amount}</Text>
+      <Text style={styles.muted}>Saved securely on this device. It will sync when connected.</Text>
+      <AppButton label="Done" onPress={close} />
+      <AppButton label="Add another" variant="secondary" onPress={another} />
+    </View>
+  </SafeAreaView>;
 
-            <View style={styles.segment}>
-              {(['expense', 'income'] as const).map(value => {
-                const selected = value === type;
-                return (
-                  <Pressable
-                    key={value}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    onPress={() => {
-                      setType(value);
-                      setCategoryId('');
-                    }}
-                    style={({ pressed }) => [
-                      styles.segmentButton,
-                      selected ? styles.segmentButtonSelected : null,
-                      pressed ? styles.pressed : null,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.segmentText,
-                        selected ? styles.segmentTextSelected : null,
-                      ]}
-                    >
-                      {value === 'expense' ? 'Expense' : 'Income'}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Transfer between accounts"
-                onPress={() => router.replace('/transfer' as never)}
-                style={({ pressed }) => [
-                  styles.segmentButton,
-                  pressed ? styles.pressed : null,
-                ]}
-              >
-                <Text style={styles.segmentText}>Transfer</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.amountCard}>
-              <Text style={styles.amountLabel}>Amount</Text>
-              <View style={styles.amountRow}>
-                <Text style={styles.currencyCode}>
-                  {selectedAccount?.currency_code ?? '---'}
-                </Text>
-                <TextInput
-                  accessibilityLabel="Amount"
-                  autoFocus
-                  value={amount}
-                  onChangeText={setAmount}
-                  placeholder="0.00"
-                  placeholderTextColor={colors.textTertiary}
-                  selectionColor={colors.focus}
-                  keyboardType="decimal-pad"
-                  style={styles.amountInput}
-                />
-              </View>
-            </View>
-
-            {options.error ? (
-              <InlineNotice
-                tone="error"
-                message={toUserFacingError(options.error, 'transaction')}
-              />
-            ) : null}
-
-            {accounts.length === 0 && !options.isLoading ? (
-              <View style={styles.emptyAccountCard}>
-                <View style={styles.smallIcon}>
-                  <Ionicons
-                    name="wallet-outline"
-                    size={21}
-                    color={colors.primary}
-                  />
-                </View>
-                <View style={styles.emptyAccountCopy}>
-                  <Text style={styles.emptyAccountTitle}>Add an account first</Text>
-                  <Text style={styles.emptyAccountBody}>
-                    Transactions need an account so balances stay correct.
-                  </Text>
-                </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Add account"
-                  onPress={() => router.push('/add-account' as never)}
-                  style={({ pressed }) => pressed ? styles.pressed : null}
-                >
-                  <Text style={styles.textAction}>Add</Text>
-                </Pressable>
-              </View>
-            ) : null}
-
-            {accounts.length > 0 ? (
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Account</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.chipRow}
-                >
-                  {accounts.map(account => {
-                    const selected = account.id === accountId;
-                    return (
-                      <Pressable
-                        key={account.id}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected }}
-                        onPress={() => setAccountId(account.id)}
-                        style={({ pressed }) => [
-                          styles.chip,
-                          selected ? styles.chipSelected : null,
-                          pressed ? styles.pressed : null,
-                        ]}
-                      >
-                        <Text
-                          numberOfLines={1}
-                          style={[
-                            styles.chipText,
-                            selected ? styles.chipTextSelected : null,
-                          ]}
-                        >
-                          {account.name} · {account.currency_code}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            ) : null}
-
-            {categories.length > 0 ? (
-              <View style={styles.fieldGroup}>
-                <View style={styles.fieldHeadingRow}>
-                  <Text style={styles.fieldLabel}>Category</Text>
-                  {categoryId ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Clear category"
-                      hitSlop={8}
-                      onPress={() => setCategoryId('')}
-                    >
-                      <Text style={styles.clearAction}>Clear</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.chipRow}
-                >
-                  {categories.map(category => {
-                    const selected = category.id === categoryId;
-                    return (
-                      <Pressable
-                        key={category.id}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected }}
-                        onPress={() => setCategoryId(category.id)}
-                        style={({ pressed }) => [
-                          styles.chip,
-                          selected ? styles.chipSelected : null,
-                          pressed ? styles.pressed : null,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.chipText,
-                            selected ? styles.chipTextSelected : null,
-                          ]}
-                        >
-                          {category.default_name}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            ) : null}
-
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>
-                {type === 'expense' ? 'Merchant' : 'Source'}
-              </Text>
-              <TextInput
-                accessibilityLabel={
-                  type === 'expense' ? 'Merchant' : 'Income source'
-                }
-                value={merchant}
-                onChangeText={setMerchant}
-                placeholder={
-                  type === 'expense'
-                    ? 'Where did you spend?'
-                    : 'Where did it come from?'
-                }
-                placeholderTextColor={colors.textTertiary}
-                selectionColor={colors.focus}
-                style={styles.input}
-              />
-            </View>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ expanded: showMore }}
-              onPress={() => setShowMore(value => !value)}
-              style={({ pressed }) => [
-                styles.moreButton,
-                pressed ? styles.pressed : null,
-              ]}
-            >
-              <Text style={styles.moreButtonText}>
-                {showMore ? 'Hide details' : 'More details'}
-              </Text>
-              <Ionicons
-                name={showMore ? 'chevron-up' : 'chevron-down'}
-                size={18}
-                color={colors.primary}
-              />
+  return <SafeAreaView edges={['bottom']} style={styles.safe}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
+      <View style={styles.frame}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <Text accessibilityRole="header" style={[styles.title, styles.flex]}>Add transaction</Text>
+            <Pressable disabled={busy} accessibilityRole="button" accessibilityLabel="Close transaction form" onPress={close} style={styles.iconButton}>
+              <Ionicons name="close" size={24} color={colors.text} />
             </Pressable>
-
-            {showMore ? (
-              <View style={styles.detailsCard}>
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Date</Text>
-                  <TextInput
-                    accessibilityLabel="Transaction date"
-                    value={transactionDate}
-                    onChangeText={setTransactionDate}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={colors.textTertiary}
-                    autoCapitalize="none"
-                    selectionColor={colors.focus}
-                    style={styles.input}
-                  />
-                </View>
-
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Note</Text>
-                  <TextInput
-                    accessibilityLabel="Transaction note"
-                    value={notes}
-                    onChangeText={setNotes}
-                    placeholder="Optional"
-                    placeholderTextColor={colors.textTertiary}
-                    selectionColor={colors.focus}
-                    multiline
-                    style={[styles.input, styles.notes]}
-                  />
-                </View>
-              </View>
-            ) : null}
-
-            {errorMessage ? (
-              <InlineNotice tone="error" message={errorMessage} />
-            ) : null}
-
-            <View style={styles.syncNote}>
-              <Ionicons
-                name="cloud-done-outline"
-                size={17}
-                color={colors.textTertiary}
-              />
-              <Text style={styles.syncNoteText}>
-                Saves securely on this device first and syncs when available.
-              </Text>
-            </View>
-          </ScrollView>
-
-          <View style={styles.actionFooter}>
-            <AppButton
-              label={
-                createMutation.isPending
-                  ? 'Saving...'
-                  : type === 'expense'
-                    ? 'Add expense'
-                    : 'Add income'
-              }
-              loading={createMutation.isPending}
-              disabled={!canSave}
-              icon="checkmark"
-              onPress={() => void save()}
-            />
           </View>
+          <View style={styles.segment}>
+            {(['expense', 'income'] as const).map(value => <Pressable key={value} disabled={busy} accessibilityRole="button"
+              accessibilityState={{ selected: value === kind, disabled: busy }} onPress={() => { if (value !== kind) { setCategoryChoice(null); setRepeatLoaded(false); onKindChange(value); } }}
+              style={[styles.segmentButton, value === kind && styles.segmentSelected]}>
+              <Text style={styles.link}>{value === 'expense' ? 'Expense' : 'Income'}</Text>
+            </Pressable>)}
+            <Pressable disabled={busy} accessibilityRole="button" onPress={() => router.push('/transfer' as never)} style={styles.segmentButton}>
+              <Text style={styles.link}>Transfer</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.amountCard}>
+            <Text style={styles.muted}>{account?.currency_code ?? 'Select an account'} · Amount</Text>
+            <TextInput editable={!busy} accessibilityLabel="Transaction amount" value={amount} onChangeText={setAmount}
+              placeholder="0" placeholderTextColor={colors.textTertiary} keyboardType="decimal-pad" maxLength={32} style={styles.amountInput} />
+            {suggestions.repeat && <Pressable disabled={busy} accessibilityRole="button" accessibilityLabel={`Repeat last ${kind} and review before saving`}
+              onPress={repeat} style={styles.textAction}><Text style={styles.link}>↻ Repeat last {kind}</Text></Pressable>}
+            {repeatLoaded && <Text accessibilityLiveRegion="polite" style={styles.muted}>Details filled for today. Review them, then save.</Text>}
+          </View>
+
+          {options.isPending && <Text accessibilityLiveRegion="polite" style={styles.muted}>Loading saved accounts and categories…</Text>}
+          {options.isError && <View style={styles.notice}><Text style={styles.error}>Could not load transaction options.</Text>
+            <AppButton label="Retry" variant="ghost" onPress={() => { void options.refetch(); }} /></View>}
+          {!options.isPending && !options.isError && !accounts.length && <View style={styles.notice}>
+            <Text style={styles.sectionTitle}>Add an account first</Text><Text style={styles.muted}>An account gives this transaction its currency and balance.</Text>
+            <AppButton label="Add account" variant="secondary" onPress={() => router.push('/add-account' as never)} />
+          </View>}
+          {accounts.length > 0 && <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Account</Text>
+            <View style={styles.chips}>{accounts.map(item => <Pressable key={item.id} disabled={busy} accessibilityRole="button"
+              accessibilityState={{ selected: item.id === accountId, disabled: busy }} onPress={() => setAccountChoice(item.id)}
+              style={[styles.chip, item.id === accountId && styles.selectedChip]}>
+              <Text style={[styles.chipText, item.id === accountId && styles.link]}>{item.name} · {item.currency_code}</Text>
+            </Pressable>)}</View>
+            {accountChoice === null && history.data?.length && account ? <Text style={styles.caption}>Last used account when available</Text> : null}
+          </View>}
+
+          {categories.length > 0 && <View style={styles.section}>
+            <View style={styles.header}><Text style={[styles.sectionTitle, styles.flex]}>Category</Text>
+              {categoryChoice === null && category && <Text style={styles.caption}>{suggestions.categoryReason}</Text>}</View>
+            <View style={styles.chips}>{visibleCategories.map(item => <Pressable key={item.id} disabled={busy} accessibilityRole="button"
+              accessibilityState={{ selected: item.id === categoryId, disabled: busy }} onPress={() => setCategoryChoice(item.id)}
+              style={[styles.chip, item.id === categoryId && styles.selectedChip]}>
+              <Text style={[styles.chipText, item.id === categoryId && styles.link]}>{item.default_name}</Text>
+            </Pressable>)}</View>
+            {categories.length > 6 && <Pressable disabled={busy} accessibilityRole="button" accessibilityState={{ expanded: allCategories }}
+              onPress={() => setAllCategories(!allCategories)} style={styles.textAction}><Text style={styles.link}>{allCategories ? 'Show fewer' : 'All categories'}</Text></Pressable>}
+          </View>}
+          {!options.isPending && !options.isError && !categories.length && accounts.length > 0 && <Text style={styles.error}>No categories are available. Sync your data from Home, then try again.</Text>}
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{kind === 'expense' ? 'Merchant' : 'Source'} <Text style={styles.caption}>optional</Text></Text>
+            <TextInput editable={!busy} accessibilityLabel={kind === 'expense' ? 'Merchant, optional' : 'Income source, optional'} value={merchant}
+              onChangeText={setMerchant} maxLength={160} placeholder={kind === 'expense' ? 'Who did you pay?' : 'Where did it come from?'}
+              placeholderTextColor={colors.textTertiary} style={styles.input} />
+            <View style={styles.chips}>{suggestions.merchants.map(label => <Pressable key={label} disabled={busy} accessibilityRole="button"
+              accessibilityLabel={`Use recent merchant ${label}`} onPress={() => setMerchant(label)} style={styles.chip}>
+              <Text style={styles.chipText}>{label}</Text>
+            </Pressable>)}</View>
+          </View>
+
+          <Pressable disabled={busy} accessibilityRole="button" accessibilityState={{ expanded: details }} onPress={() => setDetails(!details)} style={styles.detailToggle}>
+            <Text style={styles.link}>{details ? 'Fewer details' : 'More details'}</Text>
+            <Ionicons name={details ? 'chevron-up' : 'chevron-down'} size={18} color={colors.primary} />
+          </Pressable>
+          {details && <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Date</Text><TextInput editable={!busy} accessibilityLabel="Date in YYYY-MM-DD format" value={date}
+              onChangeText={setDate} placeholder="YYYY-MM-DD" maxLength={10} autoCapitalize="none" style={styles.input} />
+            {!validDate(date) && <Text style={styles.error}>Use a valid date in YYYY-MM-DD format.</Text>}
+            <Text style={styles.sectionTitle}>Note <Text style={styles.caption}>optional</Text></Text>
+            <TextInput editable={!busy} accessibilityLabel="Note, optional" value={notes} onChangeText={setNotes} maxLength={2000}
+              multiline placeholder="Anything to remember?" placeholderTextColor={colors.textTertiary} style={[styles.input, styles.note]} />
+          </View>}
+          {amount.trim() && account && !validAmount(amount, account.currency_minor_unit)
+            ? <Text style={styles.error}>Enter an amount above zero with at most {account.currency_minor_unit} decimal places.</Text> : null}
+          {error && <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={styles.error}>{error}</Text>}
+          {history.isError && <Text style={styles.caption}>Recent suggestions are unavailable. You can still enter a transaction.</Text>}
+        </ScrollView>
+        <View style={styles.footer}>
+          <Text style={styles.caption}>{account && category ? `${account.name} · ${category.default_name} · ${date}` : 'Choose an account and category to continue'}</Text>
+          <AppButton label={kind === 'expense' ? 'Add expense' : 'Add income'} loading={busy} disabled={!canSave} onPress={() => { void save(); }} />
+          <Text style={styles.caption}>Saved on this device first · syncs when connected</Text>
         </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
+      </View>
+    </KeyboardAvoidingView>
+  </SafeAreaView>;
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
-
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-
-  content: {
-    flexGrow: 1,
-    width: '100%',
-    maxWidth: layout.contentMaxWidth,
-    alignSelf: 'center',
-    paddingHorizontal: layout.screenHorizontalPadding,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xl,
-    gap: spacing.lg,
-  },
-
-  header: {
-    gap: spacing.sm,
-  },
-
-  headerRow: {
-    minHeight: layout.touchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-
-  iconButton: {
-    width: layout.touchTarget,
-    height: layout.touchTarget,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  iconButtonPlaceholder: {
-    width: layout.touchTarget,
-    height: layout.touchTarget,
-  },
-
-  iconButtonPressed: {
-    backgroundColor: colors.surfaceMuted,
-  },
-
-  title: {
-    flex: 1,
-    color: colors.text,
-    fontSize: typography.heading,
-    lineHeight: typography.lineHeightHeading,
-    fontWeight: typography.weightBold,
-    textAlign: 'center',
-    letterSpacing: -0.4,
-  },
-
-  subtitle: {
-    alignSelf: 'center',
-    maxWidth: 440,
-    color: colors.textSecondary,
-    fontSize: typography.small,
-    lineHeight: typography.lineHeightSmall,
-    textAlign: 'center',
-  },
-
-  segment: {
-    flexDirection: 'row',
-    padding: spacing.xxs,
-    borderRadius: radii.md,
-    backgroundColor: colors.surfaceMuted,
-  },
-
-  segmentButton: {
-    flex: 1,
-    minHeight: layout.touchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.sm,
-  },
-
-  segmentButtonSelected: {
-    backgroundColor: colors.surface,
-    ...elevation.card,
-  },
-
-  segmentText: {
-    color: colors.textSecondary,
-    fontSize: typography.small,
-    lineHeight: typography.lineHeightSmall,
-    fontWeight: typography.weightSemibold,
-  },
-
-  segmentTextSelected: {
-    color: colors.primary,
-  },
-
-  amountCard: {
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.lg,
-  },
-
-  amountLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.small,
-    lineHeight: typography.lineHeightSmall,
-    fontWeight: typography.weightMedium,
-  },
-
-  amountRow: {
-    maxWidth: '100%',
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-
-  currencyCode: {
-    color: colors.textSecondary,
-    fontSize: typography.subheading,
-    fontWeight: typography.weightSemibold,
-  },
-
-  amountInput: {
-    minWidth: 130,
-    maxWidth: '75%',
-    padding: 0,
-    color: colors.text,
-    fontSize: 42,
-    lineHeight: 50,
-    fontWeight: typography.weightBold,
-    letterSpacing: -1.2,
-    textAlign: 'center',
-    fontVariant: ['tabular-nums'],
-  },
-
-  fieldGroup: {
-    gap: spacing.xs,
-  },
-
-  fieldHeadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-
-  fieldLabel: {
-    color: colors.text,
-    fontSize: typography.small,
-    lineHeight: typography.lineHeightSmall,
-    fontWeight: typography.weightSemibold,
-  },
-
-  chipRow: {
-    gap: spacing.xs,
-    paddingRight: layout.screenHorizontalPadding,
-  },
-
-  chip: {
-    minHeight: 42,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-  },
-
-  chipSelected: {
-    backgroundColor: colors.primarySoft,
-  },
-
-  chipText: {
-    color: colors.textSecondary,
-    fontSize: typography.small,
-    fontWeight: typography.weightMedium,
-  },
-
-  chipTextSelected: {
-    color: colors.primary,
-    fontWeight: typography.weightSemibold,
-  },
-
-  clearAction: {
-    color: colors.primary,
-    fontSize: typography.caption,
-    fontWeight: typography.weightSemibold,
-  },
-
-  input: {
-    minHeight: 52,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.sm,
-    backgroundColor: colors.surface,
-    color: colors.text,
-    fontSize: typography.body,
-    lineHeight: typography.lineHeightBody,
-  },
-
-  notes: {
-    minHeight: 96,
-    textAlignVertical: 'top',
-  },
-
-  moreButton: {
-    minHeight: layout.touchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-  },
-
-  moreButtonText: {
-    color: colors.primary,
-    fontSize: typography.small,
-    fontWeight: typography.weightSemibold,
-  },
-
-  detailsCard: {
-    gap: spacing.md,
-    padding: layout.cardPadding,
-    borderRadius: radii.lg,
-    backgroundColor: colors.surfaceMuted,
-  },
-
-  emptyAccountCard: {
-    minHeight: 80,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: layout.cardPadding,
-    borderRadius: radii.lg,
-    backgroundColor: colors.surface,
-    ...elevation.card,
-  },
-
-  smallIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primarySoft,
-  },
-
-  emptyAccountCopy: {
-    flex: 1,
-    gap: 2,
-  },
-
-  emptyAccountTitle: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: typography.weightSemibold,
-  },
-
-  emptyAccountBody: {
-    color: colors.textSecondary,
-    fontSize: typography.small,
-    lineHeight: typography.lineHeightSmall,
-  },
-
-  textAction: {
-    color: colors.primary,
-    fontSize: typography.small,
-    fontWeight: typography.weightSemibold,
-  },
-
-  syncNote: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.xs,
-  },
-
-  syncNoteText: {
-    flex: 1,
-    color: colors.textTertiary,
-    fontSize: typography.caption,
-    lineHeight: typography.lineHeightCaption,
-  },
-
-  actionFooter: {
-    width: '100%',
-    maxWidth: layout.contentMaxWidth,
-    alignSelf: 'center',
-    paddingHorizontal: layout.screenHorizontalPadding,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    backgroundColor: colors.background,
-  },
-
-  pressed: {
-    opacity: 0.72,
-  },
+  safe: { flex: 1, backgroundColor: colors.background }, flex: { flex: 1 },
+  frame: { flex: 1, width: '100%', maxWidth: 620, alignSelf: 'center' },
+  content: { padding: 20, paddingBottom: 24, gap: 24 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  title: { fontSize: 26, lineHeight: 34, color: colors.text, fontWeight: typography.weightSemibold },
+  sectionTitle: { fontSize: 16, lineHeight: 24, color: colors.text, fontWeight: typography.weightSemibold },
+  iconButton: { height: 48, width: 48, justifyContent: 'center', alignItems: 'center', borderRadius: 12, backgroundColor: colors.surfaceMuted },
+  segment: { flexDirection: 'row', backgroundColor: colors.surfaceMuted, borderRadius: 12, padding: 4, gap: 4 },
+  segmentButton: { flex: 1, minHeight: 48, padding: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
+  segmentSelected: { backgroundColor: colors.surface, ...elevation.card },
+  amountCard: { backgroundColor: colors.surface, padding: 24, borderRadius: 18, gap: 8, ...elevation.card },
+  amountInput: { fontSize: 36, lineHeight: 48, color: colors.primary, fontWeight: typography.weightSemibold, minHeight: 64, fontVariant: ['tabular-nums'] },
+  section: { gap: 12 }, muted: { fontSize: 14, lineHeight: 22, color: colors.textSecondary },
+  caption: { fontSize: 12, lineHeight: 19, color: colors.textSecondary, flexShrink: 1 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { minHeight: 48, justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, backgroundColor: colors.surfaceMuted },
+  selectedChip: { backgroundColor: colors.primarySoft }, chipText: { fontSize: 14, lineHeight: 22, color: colors.textSecondary },
+  link: { fontSize: 14, lineHeight: 22, color: colors.primary, fontWeight: typography.weightSemibold },
+  textAction: { minHeight: 48, justifyContent: 'center' },
+  input: { minHeight: 52, borderRadius: 12, padding: 16, backgroundColor: colors.surface, fontSize: 16, color: colors.text },
+  note: { minHeight: 96, textAlignVertical: 'top' },
+  detailToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 48 },
+  notice: { backgroundColor: colors.surfaceMuted, padding: 20, borderRadius: 18, gap: 12 },
+  error: { fontSize: 14, lineHeight: 22, color: colors.danger },
+  footer: { backgroundColor: colors.surface, padding: 20, gap: 10 },
+  success: { width: '100%', maxWidth: 540, alignSelf: 'center', flex: 1, justifyContent: 'center', padding: 32, gap: 20 },
+  successIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.successSurface, justifyContent: 'center', alignItems: 'center' },
+  successAmount: { fontSize: 28, lineHeight: 36, color: colors.primary, fontWeight: typography.weightSemibold, fontVariant: ['tabular-nums'] },
 });

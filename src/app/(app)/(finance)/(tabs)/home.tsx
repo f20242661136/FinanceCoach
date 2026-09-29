@@ -1,3 +1,1 @@
-export {
-  LocalHomeScreen as default,
-} from '../../../../features/finance/local-first-screens';
+export { SmartHomeScreen as default } from '../../../../features/smart-home/smart-home-screen';
