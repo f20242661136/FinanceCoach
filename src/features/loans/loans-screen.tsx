@@ -249,6 +249,7 @@ export function LoansScreen() {
         ) : null}
       </View>
 
+      <AppButton label="Open debt dashboard" icon="stats-chart-outline" variant="secondary" onPress={() => router.push('/debt-dashboard' as never)} />
       {query.isLoading ? (
         <StatePanel
           loading

@@ -36,6 +36,7 @@ export function ActivityRow({ item, onPress }: { item: ActivityItem; onPress: ()
         {item.type === 'transfer' ? ` → ${item.destination_account_name ?? 'Account unavailable'}` : item.category_name ? ` · ${item.category_name}` : ''}</Text>
       <Text style={[activityStyles.amount, item.type === 'income' && activityStyles.positive]}>{item.type === 'transfer' ? 'Sent: ' : sign}{amount}</Text>
       {item.type === 'transfer' && <Text style={activityStyles.body}>Received: {received}</Text>}
+      {item.correction_action && <Text style={activityStyles.caption}>{item.correction_status === 'rejected' ? 'Correction needs review' : item.correction_action === 'delete' ? 'Deletion awaiting sync' : 'Edit awaiting sync'}</Text>}
       <SyncBadge status={item.sync_status} />
     </View>
     <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />

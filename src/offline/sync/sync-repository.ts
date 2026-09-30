@@ -114,6 +114,8 @@ export async function
 applySyncDelta(
   userId: string,
   delta: SyncDelta,
+  completion?: (db: SQLiteDatabase) => Promise<void>,
+  preserveCursors = false,
 ): Promise<void> {
   const now =
     new Date().toISOString();
@@ -192,6 +194,7 @@ applySyncDelta(
 
               updated_at =
                 excluded.updated_at
+            WHERE CAST(excluded.server_revision AS INTEGER) >= CAST(local_accounts.server_revision AS INTEGER)
           `,
           userId,
           account.id,
@@ -373,6 +376,7 @@ applySyncDelta(
 
               updated_at =
                 excluded.updated_at
+            WHERE CAST(excluded.server_revision AS INTEGER) >= CAST(local_transactions.server_revision AS INTEGER)
           `,
           userId,
           transaction.id,
@@ -405,7 +409,7 @@ applySyncDelta(
           cursorValue,
         ]
         of Object.entries(
-          delta.next,
+          preserveCursors ? {} : delta.next,
         )
       ) {
         await tx.runAsync(
@@ -435,6 +439,7 @@ applySyncDelta(
           now,
         );
       }
+      if (completion) await completion(tx);
     },
   );
 }

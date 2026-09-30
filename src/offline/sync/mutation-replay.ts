@@ -1,3 +1,5 @@
+import { replayCorrection } from '@/features/corrections/correction-service';
+import { replayCSV } from '@/features/csv/csv-service';
 import type {
   SQLiteDatabase,
 } from 'expo-sqlite';
@@ -189,6 +191,8 @@ async function replayTransactionCreate(
 async function replayRow(
   row: SyncQueueRow,
 ) {
+  if (row.mutation_kind === 'create' && row.entity_type === 'transaction' && JSON.parse(row.payload_json)?.csv) return replayCSV(row);
+  if (row.mutation_kind !== 'create' && (row.entity_type === 'transaction' || row.entity_type === 'transfer')) return replayCorrection(row);
   if (
     row.mutation_kind !==
     'create'
@@ -253,12 +257,9 @@ replayQueuedMutations(
 
 
   for (const row of rows) {
+    const claimed = await markMutationProcessing(userId, row.operation_id);
+    if (!claimed) continue;
     result.attempted += 1;
-
-    await markMutationProcessing(
-      userId,
-      row.operation_id,
-    );
 
     try {
       const replay =
@@ -279,7 +280,7 @@ replayQueuedMutations(
 
 
       const permanent =
-        replay.code ===
+        replay.code === 'CORRECTION_REJECTED' || replay.code ===
           'UNSUPPORTED'
         ||
         isPermanentError(
@@ -311,8 +312,7 @@ replayQueuedMutations(
        * are local permanent failures and require user attention.
        */
       const permanent =
-        error instanceof ZodError
-        || error instanceof SyntaxError;
+        row.mutation_kind === 'create' && !row.payload_json.includes('"csv"') && (error instanceof ZodError || error instanceof SyntaxError);
 
       await failMutation(
         userId,

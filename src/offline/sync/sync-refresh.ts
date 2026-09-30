@@ -70,6 +70,7 @@ async function performRefresh(
   queryClient: QueryClient,
   userId: string,
 ): Promise<SyncRunResult> {
+  try {
   await replayQueuedMutations(
     db,
     userId,
@@ -96,6 +97,8 @@ async function performRefresh(
     );
   }
 
+  return result;
+  } finally {
   await queryClient
     .invalidateQueries({
       queryKey:
@@ -115,8 +118,8 @@ async function performRefresh(
       queryKey: ['savings-goals'],
     }),
   ]);
+  }
 
-  return result;
 }
 
 

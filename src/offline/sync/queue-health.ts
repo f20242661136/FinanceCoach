@@ -169,6 +169,7 @@ resetFailedMutations(
 
           SET
             status = 'pending',
+            attempt_count = 0,
             next_attempt_at = NULL,
             last_error = NULL,
             updated_at = ?
@@ -176,6 +177,7 @@ resetFailedMutations(
           WHERE
             user_id = ?
             AND status = 'failed'
+            AND NOT EXISTS (SELECT 1 FROM local_transaction_corrections c WHERE c.user_id = sync_queue.user_id AND c.operation_id = sync_queue.operation_id AND c.status = 'rejected')
         `,
         new Date().toISOString(),
         userId,

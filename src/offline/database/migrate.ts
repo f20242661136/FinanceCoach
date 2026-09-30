@@ -1,6 +1,7 @@
 import type {
   SQLiteDatabase,
 } from 'expo-sqlite';
+import { CSV_SCHEMA } from '@/features/csv/csv-schema';
 import {
   LOCAL_TABLES,
   LOCAL_SCHEMA_VERSION,
@@ -316,6 +317,23 @@ const SCHEMA_V2 = `
     created_at
   );
 `;
+const SCHEMA_V3 = `
+CREATE TABLE IF NOT EXISTS local_transaction_corrections (
+ user_id TEXT NOT NULL, transaction_id TEXT NOT NULL, operation_id TEXT NOT NULL UNIQUE,
+ expected_version INTEGER NOT NULL, action TEXT NOT NULL CHECK(action IN ('update','delete')),
+ payload_json TEXT NOT NULL, original_json TEXT NOT NULL,
+ status TEXT NOT NULL CHECK(status IN ('pending','rejected')) DEFAULT 'pending',
+ attempted INTEGER NOT NULL DEFAULT 0 CHECK(attempted IN (0,1)), reason TEXT,
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ PRIMARY KEY(user_id,transaction_id)
+);
+CREATE TABLE IF NOT EXISTS local_transaction_correction_rules (
+ user_id TEXT NOT NULL, transaction_id TEXT NOT NULL, version INTEGER NOT NULL,
+ block_reason TEXT, cached_at TEXT NOT NULL, PRIMARY KEY(user_id,transaction_id)
+);
+PRAGMA user_version = 3;
+`;
+
 async function assertSchema(
   db: SQLiteDatabase,
 ): Promise<void> {
@@ -527,6 +545,16 @@ export async function migrateLocalDatabase(
     currentVersion = 2;
   }
 
+
+  if (currentVersion < 3) {
+    await db.withTransactionAsync(async () => { await db.execAsync(SCHEMA_V3); });
+    currentVersion = 3;
+  }
+
+  if (currentVersion < 4) {
+    await db.withTransactionAsync(async () => { await db.execAsync(CSV_SCHEMA); });
+    currentVersion = 4;
+  }
 
   if (
     currentVersion !==

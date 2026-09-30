@@ -173,31 +173,17 @@ listReadyMutations(
 }
 
 
-export async function
-markMutationProcessing(
-  userId: string,
-  operationId: string,
-): Promise<void> {
-  await withEncryptedWriteTransaction(
-    async (db) => {
-      await db.runAsync(
-        `
-          UPDATE sync_queue
-
-          SET
-            status = 'processing',
-            updated_at = ?
-
-          WHERE
-            user_id = ?
-            AND operation_id = ?
-        `,
-        new Date().toISOString(),
-        userId,
-        operationId,
-      );
-    },
-  );
+export async function markMutationProcessing(userId: string, operationId: string): Promise<boolean> {
+  let claimed = false;
+  await withEncryptedWriteTransaction(async db => {
+    const now = new Date().toISOString();
+    const result = await db.runAsync(`UPDATE sync_queue SET status='processing', attempt_count=attempt_count+1, updated_at=?
+      WHERE user_id=? AND operation_id=? AND attempt_count < 8 AND
+      (status='pending' OR (status='failed' AND next_attempt_at IS NOT NULL AND next_attempt_at <= ?))`, now,userId,operationId,now);
+    claimed = result.changes === 1;
+    if (claimed) await db.runAsync('UPDATE local_transaction_corrections SET attempted=1,updated_at=? WHERE user_id=? AND operation_id=?',now,userId,operationId);
+  });
+  return claimed;
 }
 
 
@@ -239,8 +225,6 @@ failMutation(
 
           SET
             status = 'failed',
-            attempt_count =
-              attempt_count + 1,
             next_attempt_at = ?,
             last_error = ?,
             updated_at = ?

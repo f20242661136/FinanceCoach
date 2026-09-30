@@ -1,3 +1,5 @@
+import { useAuth } from '@/features/auth/auth-context';
+import { markDebtChanged } from '@/features/debt/debt-service';
 import {
   useMutation,
   useQuery,
@@ -122,6 +124,8 @@ export type CreateLoanMutationInput = {
 
 export function
 useCreateLoan() {
+  const { session } = useAuth();
+  const debtUser = session?.user.id ?? '';
   const queryClient =
     useQueryClient();
 
@@ -146,6 +150,8 @@ useCreateLoan() {
 
     onSuccess:
       async () => {
+        try { await markDebtChanged(debtUser); } catch { /* The server write is accepted; retry dashboard refresh separately. */ }
+        await queryClient.invalidateQueries({ queryKey: ['debt-dashboard'] });
         await queryClient
           .invalidateQueries({
             queryKey:
@@ -170,6 +176,8 @@ export type AddLoanPaymentMutationInput = {
 
 export function
 useAddLoanPayment() {
+  const { session } = useAuth();
+  const debtUser = session?.user.id ?? '';
   const queryClient =
     useQueryClient();
 
@@ -197,6 +205,8 @@ useAddLoanPayment() {
         _result,
         variables,
       ) => {
+        try { await markDebtChanged(debtUser); } catch { /* Keep successful repayment navigation independent of local cache availability. */ }
+        await queryClient.invalidateQueries({ queryKey: ['debt-dashboard'] });
         await Promise.all([
           queryClient
             .invalidateQueries({

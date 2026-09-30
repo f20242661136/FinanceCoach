@@ -171,9 +171,15 @@ export function PlanScreen() {
     <View style={styles.section}>
       <Text accessibilityRole="header" style={styles.sectionTitle}>Debt & shared money</Text>
       <View style={styles.toolGroup}>
+        <ToolRow title="Debt dashboard" icon="stats-chart-outline" body="Debt totals, repayment progress, upcoming dates and history" onPress={() => go('/debt-dashboard')} />
         <ToolRow title="Loans" icon="cash-outline" body={toolStatus(loans, overview.activeLoanCount ? `${plural(overview.activeLoanCount, 'outstanding loan')} · borrowed and lent` : 'Keep track of money borrowed or lent')} onPress={() => go('/loans')} />
         <ToolRow title="ROSCA" icon="people-outline" body={toolStatus(groups, groups.data?.length ? `${plural(overview.activeGroupCount ?? 0, 'active group')} · ${groups.data.filter(group => group.status === 'forming').length} forming` : 'Manage saving together with your group')} onPress={() => go('/rosca')} />
       </View>
+    </View>
+
+    <View style={styles.section}>
+      <Text accessibilityRole="header" style={styles.sectionTitle}>Data tools</Text>
+      <View style={styles.toolGroup}><ToolRow title="CSV import & export" icon="document-text-outline" body="Import transactions, check duplicates and export saved financial data" onPress={() => go('/csv-tools')} /></View>
     </View>
 
     <View style={styles.section}>

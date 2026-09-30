@@ -18,6 +18,8 @@ const COLUMNS = `t.id, t.account_id, COALESCE(source.name, 'Account unavailable'
   t.currency_minor_unit, t.transaction_date, t.merchant, t.description, t.notes,
   t.destination_account_id, destination.name AS destination_account_name,
   t.destination_amount_minor, t.destination_currency_code, t.destination_currency_minor_unit,
+  (SELECT c.action FROM local_transaction_corrections c WHERE c.user_id=t.user_id AND c.transaction_id=t.id) AS correction_action,
+  (SELECT c.status FROM local_transaction_corrections c WHERE c.user_id=t.user_id AND c.transaction_id=t.id) AS correction_status,
   t.version, t.server_revision, ${STATUS} AS sync_status, t.created_at, t.updated_at`;
 
 function where(userId: string, filters: ActivityFilters) {

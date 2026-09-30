@@ -1,6 +1,6 @@
 import type { LocalActivityItem } from '@/offline/sync/local-finance-repository';
 
-export type ActivityItem = LocalActivityItem;
+export type ActivityItem = LocalActivityItem & { correction_action?: string | null; correction_status?: string | null };
 export type ActivityKind = 'all' | 'income' | 'expense' | 'transfer' | 'adjustment';
 export type ActivityStatus = 'all' | 'synced' | 'pending' | 'failed';
 export type ActivityFilters = { search: string; kind: ActivityKind; accountId: string; currency: string; status: ActivityStatus; from: string; to: string };

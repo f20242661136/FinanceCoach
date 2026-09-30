@@ -1,3 +1,5 @@
+import { CorrectionPanel } from '@/features/corrections/correction-panel';
+import { useAuth } from '@/features/auth/auth-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Text, View } from 'react-native';
 import { AppButton } from '@/components/ui/app-button';
@@ -14,6 +16,7 @@ export function TransactionDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const validId = typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ? id : '';
+  const { session } = useAuth();
   const detail = useActivityDetail(validId);
   const item = detail.data;
   function back() { if (router.canGoBack()) router.back(); else router.replace('/activity' as never); }
@@ -52,5 +55,6 @@ export function TransactionDetailScreen() {
               <ActivitySyncNotice />
               <Text style={styles.caption}>Details reflect the entry saved on this device.</Text>
             </>}
+    {validId && <CorrectionPanel key={`${session?.user.id ?? ''}:${validId}`} id={validId} />}
   </AppScreen>;
 }
