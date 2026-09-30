@@ -860,17 +860,10 @@ Deno.serve(
               channelId:
                 'finance-coach-reminders',
 
-              title:
-                String(
-                  notification.title
-                  ?? 'Finance Coach',
-                ),
-
-              body:
-                String(
-                  notification.body
-                  ?? '',
-                ),
+              // Never put financial details in OS push previews.
+              // Detailed messages remain in the authenticated notification center.
+              title: 'Finance Coach',
+              body: 'You have a new notification. Open Finance Coach to view it.',
 
               data: {
                 notificationId,

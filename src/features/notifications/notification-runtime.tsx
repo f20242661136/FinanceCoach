@@ -31,10 +31,10 @@ Notifications.setNotificationHandler({
   handleNotification:
     async () => ({
       shouldShowBanner:
-        true,
+        false,
 
       shouldShowList:
-        true,
+        false,
 
       shouldPlaySound:
         false,

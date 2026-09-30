@@ -42,7 +42,13 @@
         }
       ],
       "expo-notifications",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Finance Coach to use Face ID to unlock your financial workspace."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

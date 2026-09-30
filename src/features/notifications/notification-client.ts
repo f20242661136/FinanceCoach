@@ -69,6 +69,8 @@ ensureFinanceCoachNotificationChannel():
         description:
           'Budget, savings, goal and finance reminders.',
 
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.SECRET,
+
         importance:
           Notifications
             .AndroidImportance

@@ -339,6 +339,7 @@ export function SettingsScreen() {
         <Text style={styles.sectionTitle}>
           Privacy and security
         </Text>
+        <SettingsLink icon="lock-closed-outline" title="App lock & privacy" description="PIN, biometrics, auto-lock, recovery code, and privacy mode." onPress={() => router.push('/security' as never)} />
 
         <AppCard
           tone="muted"

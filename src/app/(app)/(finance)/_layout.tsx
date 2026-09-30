@@ -1,3 +1,4 @@
+import { PrivacyBoundary } from '@/features/security/privacy-boundary';
 import { SyncBootstrap } from '../../../offline/sync/sync-bootstrap';
 import { Stack } from 'expo-router';
 
@@ -14,7 +15,7 @@ export default function FinanceLayout() {
     <LocalDatabaseProvider>
       <FinanceProvider>
         <SyncBootstrap />
-        <Stack
+        <PrivacyBoundary><Stack
           screenOptions={{
             headerShown: false,
           }}
@@ -36,7 +37,7 @@ export default function FinanceLayout() {
               presentation: 'modal',
             }}
           />
-        </Stack>
+        </Stack></PrivacyBoundary>
       </FinanceProvider>
     </LocalDatabaseProvider>
   );
