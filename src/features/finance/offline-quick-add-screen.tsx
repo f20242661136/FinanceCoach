@@ -2,10 +2,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppButton } from '@/components/ui/app-button';
 import { colors, elevation, typography } from '@/design/tokens';
 import { useAuth } from '@/features/auth/auth-context';
+import { SetupSteps } from '@/features/getting-started/setup-ui';
+import { useSetupProgress } from '@/features/getting-started/use-setup-progress';
 import { toUserFacingError } from '@/lib/user-facing-error';
 import { useCreateOfflineTransaction } from '@/offline/sync/use-create-offline-transaction';
 import { useLocalTransactionOptions } from '@/offline/sync/use-local-transaction-options';
@@ -20,6 +22,8 @@ export function OfflineQuickAddScreen() {
 
 function EntryForm({ kind, onKindChange }: { kind: EntryKind; onKindChange: (kind: EntryKind) => void }) {
   const router = useRouter();
+  const { setup } = useLocalSearchParams<{ setup?: string }>();
+  const progress = useSetupProgress();
   const options = useLocalTransactionOptions(kind);
   const history = useEntryHistory();
   const create = useCreateOfflineTransaction();
@@ -90,7 +94,9 @@ function EntryForm({ kind, onKindChange }: { kind: EntryKind; onKindChange: (kin
       <Text accessibilityRole="header" accessibilityLiveRegion="polite" style={styles.title}>{kind === 'expense' ? 'Expense added' : 'Income added'}</Text>
       <Text style={styles.successAmount}>{account?.currency_code} {amount}</Text>
       <Text style={styles.muted}>Saved securely on this device. It will sync when connected.</Text>
-      <AppButton label="Done" onPress={close} />
+      <AppButton label={setup === '1' ? 'Continue' : 'Done'} onPress={() => {
+        if (setup === '1') router.dismissTo('/getting-started' as never); else close();
+      }} />
       <AppButton label="Add another" variant="secondary" onPress={another} />
     </View>
   </SafeAreaView>;
@@ -105,6 +111,11 @@ function EntryForm({ kind, onKindChange }: { kind: EntryKind; onKindChange: (kin
               <Ionicons name="close" size={24} color={colors.text} />
             </Pressable>
           </View>
+          {setup === '1' && <View style={styles.section}>
+            <Text style={styles.link}>STEP 3 OF 3</Text>
+            <SetupSteps facts={progress.data} />
+            <Text style={styles.muted}>Record a real expense or income to begin your money history. Today’s date is filled in; notes are optional.</Text>
+          </View>}
           <View style={styles.segment}>
             {(['expense', 'income'] as const).map(value => <Pressable key={value} disabled={busy} accessibilityRole="button"
               accessibilityState={{ selected: value === kind, disabled: busy }} onPress={() => { if (value !== kind) { setCategoryChoice(null); setRepeatLoaded(false); onKindChange(value); } }}

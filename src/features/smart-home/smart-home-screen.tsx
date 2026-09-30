@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { AppButton } from '@/components/ui/app-button';
 import { colors, elevation, typography } from '@/design/tokens';
 import { useAuth } from '@/features/auth/auth-context';
+import { GettingStartedCard } from '@/features/getting-started/getting-started-card';
 import { useFinancialDashboardSummary } from '@/features/dashboard/dashboard-query';
 import { useBudgetStatus } from '@/features/budgets/budget-query';
 import { formatMinor, formatUsagePercent } from '@/features/budgets/budget-money';
@@ -83,6 +84,7 @@ export function SmartHomeScreen() {
     </View>
     {finance.isShowingSavedData && <Text accessibilityLiveRegion="polite" style={styles.muted}>Showing saved data · pull down to retry sync</Text>}
     <SyncQueueBanner />
+    <GettingStartedCard />
     {finance.localError && <View style={styles.card}>
       <Text style={styles.rowTitle}>Could not load saved accounts or activity</Text>
       <AppButton label="Try again" variant="ghost" onPress={() => { void refresh(); }} />

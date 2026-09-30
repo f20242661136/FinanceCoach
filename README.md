@@ -1,85 +1,67 @@
-# Finance Coach — Phase 12: Plan Polish
+# Finance Coach — Phase 14: guided setup
+
+Apply this overlay to the project with Phases 11–13 already installed.
 
 ## Install
 
-This update builds on the redesign and Phase 11 that you have already installed.
+1. Close the running Expo development server.
+2. Merge the supplied `src` folder into your project root and replace matching files. Keep all other project files.
+3. Restart with `npx expo start -c` (or `bunx expo start -c` if your project uses Bun).
 
-1. Back up or commit your working project.
-2. Extract `finance-coach-phase12.zip`.
-3. Copy the contents of `finance-coach-phase12/src` into your project's `src`, using the same paths. Merge folders and replace matching files.
-4. Run from your project folder:
+No dependency installation, database migration, or backend change is required.
 
-```bash
-npx expo start -c
-```
+## What changed
 
-No packages, SQL migrations or backend configuration changes are required.
+- Currency setup introduces three steps, searchable supported currencies, a persistent selected-currency summary, and collapsible date/time preferences.
+- Home shows the next setup action until an active account and an undeleted expense or income exist for the signed-in user.
+- Account setup defaults to the profile currency when supported. The form explains balances and amounts owed, protects against duplicate taps, and refreshes supported options when Retry is pressed.
+- Guided account saves lead to the next step. Guided transaction saves offer a completion screen and a return to Home. Ordinary account and transaction entry keep their existing navigation.
+- The guide can be left at any time. Progress resumes from saved local data, including pending offline writes. Opening balances, adjustments, transfers, deleted transactions, and inactive accounts do not complete the corresponding steps.
+- Existing users with both facts see their usual Home without the setup card. If all accounts are archived, the card asks for an active account and retains the existing transaction checkmark.
 
-| File | Action |
-| --- | --- |
-| `src/app/(app)/(finance)/(tabs)/plan.tsx` | Replace the existing Plan tab route |
-| `src/features/planning/plan-screen.tsx` | Replace the existing Plan screen |
-| `src/features/planning/plan-intelligence.ts` | Add the new status helper |
+## Files
 
-## Result
+Four replacements:
 
-Plan now shows a planning summary, a recommended review, other attention items, upcoming dates, and tools grouped by purpose:
+- `src/app/(onboarding)/setup.tsx`
+- `src/features/finance/offline-add-account-screen.tsx`
+- `src/features/finance/offline-quick-add-screen.tsx`
+- `src/features/smart-home/smart-home-screen.tsx`
 
-- Spending: Budgets and Six Jars.
-- Saving: Goals, with progress previews.
-- Debt & shared money: Loans and ROSCA.
-- Habits: Challenges.
+Six additions:
 
-Each tool opens its existing screen. Goal, loan and ROSCA reviews navigate to the exact existing detail route. No financial changes happen just by opening Plan or tapping a review link.
+- `src/app/(app)/(finance)/getting-started.tsx`
+- `src/features/getting-started/setup-progress.ts`
+- `src/features/getting-started/use-setup-progress.ts`
+- `src/features/getting-started/setup-ui.tsx`
+- `src/features/getting-started/getting-started-card.tsx`
+- `src/features/getting-started/getting-started-screen.tsx`
 
-## Status rules
-
-The summary shows current budgets below 80%, known items needing review, and active goals. It labels each measure explicitly instead of counting unlike tools as universally “on track.”
-
-- Budgets: current-period budgets at or above 80% need review; over-limit budgets take precedence over near-limit budgets.
-- Goals: unfinished active goals with a target date in the past need review. Reached, paused, completed and archived goals are excluded from overdue alerts. Active goals due within seven days appear in upcoming dates.
-- Loans: outstanding active/defaulted loans need review when defaulted or their final due date has passed. Loans borrowed and given use different wording. The displayed amount is total outstanding, not an invented scheduled installment.
-- ROSCA: dates refer to an open group cycle. A past cycle date prompts a group review; it does not assert that your own contribution is unpaid. Active group cycles within seven days appear in upcoming dates.
-- Six Jars: the configured profile name and currency appear when available.
-- Challenges: the active count covers challenges whose current period includes today.
-
-The next step prioritizes overdue/defaulted loans, past open ROSCA cycles, over-limit budgets, passed goal dates, then near-limit budgets. If none require review, the earliest upcoming item appears. Empty planning data offers a clear create-budget action. Reached goals get a review action when there are no more urgent items.
-
-Money stays in its original currency and uses existing currency precision data. Amounts are omitted until precision is available; currencies are never summed together. Progress bars cap visually at 100% while the percentage text preserves the actual recorded value.
-
-## Loading, refreshing and offline behavior
-
-Statuses come from the existing server queries and their in-memory cache. Plan does not add a persistent offline planning cache.
-
-Missing responses display an unknown status, not a zero. With partially available responses, the summary shows known review items with a plus sign. Saved responses remain visible when refresh fails, with a clear notice. Pull down to retry. Stale active planning queries refresh when Plan regains focus.
-
-Home, Quick Add, the navigation layout, theme and existing tool screens remain those from your installed versions.
+The existing profile onboarding flag still completes after currency selection. Remaining steps run inside the finance route, where the encrypted local database is available. Progress is derived from user-scoped SQLite queries, with no additional onboarding state stored. Existing account/transaction mutations and sync invalidate the shared local-finance query family after saving.
 
 ## Validation
 
-- Full TypeScript check against the extracted app plus Phase 11 and Phase 12: passed.
-- Full Expo lint: zero errors; three pre-existing unused-import/function warnings in unrelated files.
-- Lint across all three delivered source files with zero warnings allowed: passed.
-- Ten executable planning tests: passed, covering missing data, current budget periods, the 80% boundary, precise amounts, completed/paused goals, seven-day deadlines, loan statuses, group-cycle wording, route identifiers and calendar boundaries.
-- TypeScript/TSX syntax scan: passed.
+- `npx tsc --noEmit`: passed against the complete Expo SDK 57 source snapshot.
+- `npx expo lint`: no errors; three existing warnings in unrelated files.
+- Strict ESLint on all ten delivered source files: no warnings.
+- 10 setup/currency regression tests and 9 SQLite query checks passed.
 
-Your original redesign overlay is not present in the attached snapshot; this package uses its known Plan route and screen paths without replacing the tab layout. An Android/iOS runtime and visual walkthrough has not been performed here.
+Run the included checks from this extracted folder with Node 24+ and Python 3:
 
-## Check after installing
-
-1. Open Plan and confirm all six tools open their existing screens.
-2. Check the summary against your current budgets and active goals.
-3. Open a goal preview and any loan/ROSCA review. Confirm the correct record opens.
-4. Try a budget at 80% or above and an unfinished goal with a past target date, if you have them.
-5. Confirm any ROSCA date is presented as a group-cycle date.
-6. Add or update a planning record in its existing screen, then return to Plan and refresh.
-7. Test offline behavior: cached responses should stay visible when available; unavailable statuses should not appear as zero.
-8. Check a small phone and larger system text: metrics and headings wrap, and the whole screen scrolls.
-
-Optional regression command, using Node 24 from the extracted package folder:
-
-```bash
-node tests/plan-intelligence.test.mjs
+```sh
+node tests/setup.test.mjs
+python3 tests/setup-query.test.py
 ```
 
-To roll back, restore the two replaced files from your backup and remove the new status helper.
+## Device checks after merging
+
+These need your running app and signed-in backend; no device session was available here.
+
+1. With a new user, search currencies by name or code, select one, and continue. Home should show Step 2.
+2. Add an account. Confirm its currency matches your selection; save and see Step 3. Canceling should leave progress intact.
+3. Add an expense or income, then Continue. Confirm the completion message; View my Home should show the account/activity and hide the setup card.
+4. Restart between steps and confirm the next action resumes. After options have loaded, repeat account/transaction entry offline and confirm local saves advance progress.
+5. Check empty/error/retry currency and account options, liability balances, decimal precision, keyboard layout, large text, and ordinary entry outside the guide.
+6. An existing user with accounts and transactions should see no setup card. Switching users must not reuse another user's progress.
+
+First currency selection requires connectivity to retrieve supported currencies. Account types, currencies, and transaction categories must have been loaded once before offline entry is available. Home monthly totals continue to use the existing server summary, so an offline transaction can appear in recent activity before monthly totals refresh.

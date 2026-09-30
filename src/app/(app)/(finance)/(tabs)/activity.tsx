@@ -1,3 +1,1 @@
-export {
-  LocalActivityScreen as default,
-} from '../../../../features/finance/local-first-screens';
+export { ActivityScreen as default } from '@/features/activity/activity-screen';
